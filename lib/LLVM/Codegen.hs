@@ -1,4 +1,5 @@
-{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE RecursiveDo, OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-type-defaults#-}
 
 module LLVM.Codegen
   ( module LLVM.Codegen  -- TODO clean up exports
@@ -6,7 +7,9 @@ module LLVM.Codegen
 
 import Control.Monad.State.Lazy
 import Data.Functor.Identity
+import Data.Foldable
 import qualified Data.Text as T
+import qualified Data.List as L
 import Data.Text (Text)
 
 newtype Operand
@@ -69,14 +72,14 @@ add lhs rhs = emitInstr $ Add lhs rhs
 emitInstr :: Monad m => IR -> IRBuilderT m Operand
 emitInstr instr = do
   operand <- mkOperand
-  modify $ \(IRBuilderState counter instrs) ->
-    IRBuilderState (counter + 1) ((operand, instr) : instrs)
+  modify $ \s -> s { instructions = (operand, instr) : instructions s }
   pure operand
 
 -- NOTE: Only used internally, this creates an unassigned operand
 mkOperand :: Monad m => IRBuilderT m Operand
 mkOperand = do
   count <- gets operandCounter
+  modify $ \s -> s { operandCounter = operandCounter s + 1 }
   pure $ Operand $ "%" <> T.pack (show count)
 
 data Type = IntType Int
@@ -101,7 +104,29 @@ exampleIR = runIRBuilder $ mdo
 
 exampleModule :: [Definition]
 exampleModule = runModuleBuilder $ do
-  function (Label "add") [IntType 1, IntType 32] $ \[x, y] -> do
+  function (Label "add") [IntType 1, IntType 32] $ \[x, y] -> mdo
     add x y
 
--- $> exampleModule
+pp :: [Definition] -> Text
+pp defs =
+  mconcat $ L.intersperse "\n" $ map ppDefinition defs
+
+ppDefinition :: Definition -> Text
+ppDefinition = \case
+  Function (Label name) argTys body ->
+    "define ccc void @" <> name <> "(" <> fold (L.intersperse ", " (zipWith ppArg [0..] argTys)) <> ")" <> "{\n" <>
+      ppBody body <> "\n" <>
+      "}"
+    where
+      ppArg i _argTy = ppOperand $ Operand $ "%" <> T.pack (show i)
+      ppBody instrs = fold $ L.intersperse "\n" $ map (uncurry ppStmt) instrs
+      ppStmt :: Operand -> IR -> Text
+      ppStmt operand instr = ppOperand operand <> " = " <> ppInstr instr
+      ppInstr :: IR -> Text
+      ppInstr = \case
+        Add a b -> "add " <> ppOperand a <> " " <> ppOperand b
+
+ppOperand :: Operand -> Text
+ppOperand = unOperand
+
+-- $> putStrLn . Data.Text.unpack $ pp exampleModule
