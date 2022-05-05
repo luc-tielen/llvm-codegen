@@ -9,8 +9,21 @@ import Data.Functor.Identity
 import qualified Data.Text as T
 import Data.Text (Text)
 
+newtype Operand
+  = Operand { unOperand :: Text }
+  deriving Show  -- TODO remove
+
+newtype Label = Label Text
+  deriving Show
+
+data IR
+  = Add Operand Operand
+  deriving Show  -- TODO remove
+
+
 type Counter = Int
 
+-- TODO: store first terminator
 data IRBuilderState
   = IRBuilderState
   { operandCounter :: Counter
@@ -32,15 +45,23 @@ runIRBuilderT (IRBuilderT m) =
 runIRBuilder :: IRBuilder a -> [(Operand, IR)]
 runIRBuilder = runIdentity . runIRBuilderT
 
-newtype Operand
-  = Operand { unOperand :: Text }
-  deriving Show  -- TODO remove
 
-newtype Label = Label Text
+-- TODO: rename Label -> Name?
+data Definition = Function Label [Type] [(Operand, IR)]  -- TODO: introduce basic blocks
+  deriving Show
 
-data IR
-  = Add Operand Operand
-  deriving Show  -- TODO remove
+type ModuleBuilderState = [Definition]
+
+-- TODO transformer
+newtype ModuleBuilder a
+  = ModuleBuilder (State ModuleBuilderState a)
+  deriving (Functor, Applicative, Monad, MonadState ModuleBuilderState, MonadFix)
+  via State ModuleBuilderState
+
+runModuleBuilder :: ModuleBuilder a -> [Definition]
+runModuleBuilder (ModuleBuilder m) =
+  execState m []
+
 
 add :: Monad m => Operand -> Operand -> IRBuilderT m Operand
 add lhs rhs = emitInstr $ Add lhs rhs
@@ -58,13 +79,29 @@ mkOperand = do
   count <- gets operandCounter
   pure $ Operand $ "%" <> T.pack (show count)
 
-example :: [(Operand, IR)]
-example = runIRBuilder $ mdo
+data Type = IntType Int
+  deriving Show  -- TODO remove
+
+function :: Label -> [Type] -> ([Operand] -> IRBuilderT ModuleBuilder a) -> ModuleBuilder Operand
+function lbl@(Label name) tys fnBody = do
+  instrs <- runIRBuilderT $ do
+    operands <- traverse (const mkOperand) tys
+    fnBody operands
+  let fn = Function lbl tys instrs
+  modify $ (fn:)  -- TODO: store operand
+  pure $ Operand $ "@" <> name
+
+exampleIR :: [(Operand, IR)]
+exampleIR = runIRBuilder $ mdo
   let a = Operand "a"
   let b = Operand "b"
   d <- add a c
   c <- add a b
   pure d
 
+exampleModule :: [Definition]
+exampleModule = runModuleBuilder $ do
+  function (Label "add") [IntType 1, IntType 32] $ \[x, y] -> do
+    add x y
 
--- $> example
+-- $> exampleModule
