@@ -3,6 +3,8 @@
 A Haskell library for generating LLVM code. Inspired by the `llvm-hs`,
 `llvm-hs-pure`, `llvm-hs-combinators` and the `llvm-hs-pretty` libraries.
 
+**NOTE: WIP**
+
 ## Why another LLVM library?
 
 - Support for the latest LLVM (!)
