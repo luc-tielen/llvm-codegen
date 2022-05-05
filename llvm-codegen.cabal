@@ -1,0 +1,79 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.7.
+--
+-- see: https://github.com/sol/hpack
+
+name:           llvm-codegen
+version:        0.1.0.0
+category:       Compilers
+homepage:       https://github.com/luc-tielen/llvm-codegen
+author:         Luc Tielen
+maintainer:     luc.tielen@gmail.com
+copyright:      Luc Tielen, 2022
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+library
+  exposed-modules:
+      LLVM.Codegen
+  other-modules:
+      Paths_llvm_codegen
+  hs-source-dirs:
+      lib
+  default-extensions:
+      OverloadedStrings
+      LambdaCase
+      TupleSections
+      DeriveFunctor
+      DeriveFoldable
+      DeriveTraversable
+      DeriveGeneric
+      DeriveAnyClass
+      DerivingStrategies
+      DerivingVia
+      FlexibleContexts
+      FlexibleInstances
+      ScopedTypeVariables
+  ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits
+  build-depends:
+      base >=4.7 && <5
+    , containers ==0.*
+    , mtl ==2.*
+    , text ==1.*
+  default-language: Haskell2010
+
+test-suite llvm-codegen-test
+  type: exitcode-stdio-1.0
+  main-is: test.hs
+  other-modules:
+      Paths_llvm_codegen
+  hs-source-dirs:
+      tests
+  default-extensions:
+      OverloadedStrings
+      LambdaCase
+      TupleSections
+      DeriveFunctor
+      DeriveFoldable
+      DeriveTraversable
+      DeriveGeneric
+      DeriveAnyClass
+      DerivingStrategies
+      DerivingVia
+      FlexibleContexts
+      FlexibleInstances
+      ScopedTypeVariables
+  ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits
+  build-depends:
+      base >=4.7 && <5
+    , containers ==0.*
+    , hspec >=2.6.1 && <3.0.0
+    , hspec-hedgehog ==0.*
+    , llvm-codegen
+    , mtl ==2.*
+    , text ==1.*
+  default-language: Haskell2010

@@ -1,0 +1,52 @@
+name: llvm-codegen
+version: 0.1.0.0
+#synopsis:
+#description:
+homepage: https://github.com/luc-tielen/llvm-codegen
+license: BSD3
+author: Luc Tielen
+maintainer: luc.tielen@gmail.com
+copyright: Luc Tielen, 2022
+category: Compilers
+extra-source-files:
+  - README.md
+
+dependencies:
+  - base >= 4.7 && < 5
+  - text == 1.*
+  - containers == 0.*
+  - mtl == 2.*
+
+default-extensions:
+  - OverloadedStrings
+  - LambdaCase
+  - TupleSections
+  - DeriveFunctor
+  - DeriveFoldable
+  - DeriveTraversable
+  - DeriveGeneric
+  - DeriveAnyClass
+  - DerivingStrategies
+  - DerivingVia
+  - FlexibleContexts
+  - FlexibleInstances
+  - ScopedTypeVariables
+
+ghc-options:
+  - -Wall
+  - -fhide-source-paths
+  - -fno-show-valid-hole-fits
+  - -fno-sort-valid-hole-fits
+
+library:
+  source-dirs: lib
+
+tests:
+  llvm-codegen-test:
+    main: test.hs
+    source-dirs: tests
+    dependencies:
+      - base >= 4.7 && < 5
+      - llvm-codegen
+      - hspec >= 2.6.1 && < 3.0.0
+      - hspec-hedgehog == 0.*
