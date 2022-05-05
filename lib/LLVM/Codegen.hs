@@ -12,6 +12,8 @@ import Data.Monoid
 import qualified Data.Text as T
 import qualified Data.List as L
 import Data.Text (Text)
+import qualified Data.DList as DList
+import Data.DList (DList)
 
 newtype Operand
   = Operand { unOperand :: Text }
@@ -31,7 +33,7 @@ type Counter = Int
 data BasicBlock
   = BB
   { bbLabel :: Label
-  , bbInstructions :: [(Operand, IR)]  -- TODO diff list
+  , bbInstructions :: DList (Operand, IR)
   , bbTerminator :: First Terminator
   } deriving Show
 
@@ -42,7 +44,7 @@ newtype Terminator
 data IRBuilderState
   = IRBuilderState
   { operandCounter :: Counter
-  , basicBlocks :: [BasicBlock]  -- TODO diff list
+  , basicBlocks :: DList BasicBlock
   }
 
 newtype IRBuilderT m a
@@ -55,7 +57,7 @@ type IRBuilder = IRBuilderT Identity
 runIRBuilderT :: Monad m => IRBuilderT m a -> m [BasicBlock]
 runIRBuilderT (IRBuilderT m) =
   -- TODO: need scc?
-  fmap (reverse . basicBlocks) <$> execStateT m $ IRBuilderState 0 mempty
+  fmap (flip DList.apply mempty . basicBlocks) <$> execStateT m $ IRBuilderState 0 mempty
 
 runIRBuilder :: IRBuilder a -> [BasicBlock]
 runIRBuilder = runIdentity . runIRBuilderT
@@ -88,15 +90,16 @@ emitInstr instr = do
   pure operand
   where
     addInstrToCurrentBasicBlock operand s =
-      case basicBlocks s of
+      -- TODO: don't use DList.head, instead keep track of current BB separately
+      case DList.toList (basicBlocks s) of
         [] ->
           let name = Label "start"
               term = mempty
-              curr' = BB name [(operand, instr)] term
-          in s { basicBlocks = [curr']}
+              curr' = BB name (DList.singleton (operand, instr)) term
+          in s { basicBlocks = DList.singleton curr' }
         (BB name instrs term):rest ->
-          let curr' = BB name ((operand, instr):instrs) term
-          in s { basicBlocks = curr':rest }
+          let curr' = BB name (DList.cons (operand, instr) instrs) term
+          in s { basicBlocks = DList.cons curr' $ DList.fromList rest }  -- TODO: remove usage of fromList
 
 
 -- NOTE: Only used internally, this creates an unassigned operand
@@ -150,7 +153,7 @@ ppBasicBlock :: BasicBlock -> Text
 ppBasicBlock (BB (Label bbName) stmts term) =
   T.unlines
   [ bbName <> ":"
-    , T.intercalate "\n" $ reverse $ map (uncurry ppStmt) stmts
+    , T.intercalate "\n" $ reverse $ map (uncurry ppStmt) $ DList.apply stmts []
     , case getFirst term of
       Nothing -> ppInstr $ Ret Nothing
       Just (Terminator term') -> ppInstr term'

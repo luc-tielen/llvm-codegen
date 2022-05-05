@@ -16,6 +16,7 @@ dependencies:
   - text == 1.*
   - containers == 0.*
   - mtl == 2.*
+  - dlist == 1.*
 
 default-extensions:
   - OverloadedStrings
