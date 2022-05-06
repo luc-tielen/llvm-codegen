@@ -9,6 +9,7 @@ import Control.Monad.State.Lazy
 import Data.Functor.Identity
 import Data.Foldable
 import Data.Monoid
+import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.List as L
 import Data.Text (Text)
@@ -51,6 +52,7 @@ newtype Terminator
 data IRBuilderState
   = IRBuilderState
   { operandCounter :: Counter
+  , blockCounter :: Counter
   , basicBlocks :: DList BasicBlock
   , currentBlock :: PartialBlock
   }
@@ -65,13 +67,15 @@ type IRBuilder = IRBuilderT Identity
 runIRBuilderT :: Monad m => IRBuilderT m a -> m [BasicBlock]
 runIRBuilderT (IRBuilderT m) = do
   let partialBlock = PartialBlock (Name "start") mempty mempty
-      result = execStateT m $ IRBuilderState 0 mempty partialBlock
+      result = execStateT m $ IRBuilderState 0 0 mempty partialBlock
   previousBlocks <- fmap (flip DList.apply mempty . basicBlocks) result
   currentBlk <- fmap currentBlock result
-  let currentTerm = Terminator $ case getFirst $ pbTerminator currentBlk of
-        Nothing -> Ret Nothing
-        Just (Terminator term) -> term
-  pure $ previousBlocks ++ [BB (pbName currentBlk) (pbInstructions currentBlk) currentTerm]
+  pure $ previousBlocks ++ [partialBlockToBasicBlock currentBlk]
+
+partialBlockToBasicBlock :: PartialBlock -> BasicBlock
+partialBlockToBasicBlock pb =
+  let currentTerm = fromMaybe (Terminator $ Ret Nothing) $ getFirst $ pbTerminator pb
+  in BB (pbName pb) (pbInstructions pb) currentTerm
 
 runIRBuilder :: IRBuilder a -> [BasicBlock]
 runIRBuilder = runIdentity . runIRBuilderT
@@ -106,7 +110,7 @@ emitInstr instr = do
   pure operand
   where
     addInstrToCurrentBlock operand s =
-      -- TODO: record dot syntax?
+      -- TODO: record dot syntax? or create a helper function if this pattern occurs a lot..
       let instrs = DList.snoc (pbInstructions . currentBlock $ s) (operand, instr)
        in s { currentBlock = (currentBlock s) { pbInstructions = instrs } }
 
@@ -117,9 +121,18 @@ mkOperand = do
   modify $ \s -> s { operandCounter = operandCounter s + 1 }
   pure $ Operand $ "%" <> T.pack (show count)
 
--- block :: IRBuilderT m a
--- block = do
---   _
+block :: Monad m => IRBuilderT m Name
+block = do
+  count <- gets blockCounter
+  let blockName = Name $ "block_" <> T.pack (show count)
+  modify $ \s ->
+    let currBlock = currentBlock s
+        blocks = basicBlocks s
+     in s { basicBlocks = DList.snoc blocks (partialBlockToBasicBlock currBlock)
+          , currentBlock = PartialBlock blockName mempty mempty  -- TODO: use counter
+          , blockCounter = count + 1
+          }
+  pure blockName
 
 data Type = IntType Int
   deriving Show
@@ -143,11 +156,11 @@ exampleIR = runIRBuilder $ mdo
 
 exampleModule :: [Definition]
 exampleModule = runModuleBuilder $ do
-  function (Name "add") [IntType 1, IntType 32] $ \[x, y] -> mdo
+  function (Name "do_add") [IntType 1, IntType 32] $ \[x, y] -> mdo
     z <- add x y
     add z y
 
-    -- block
+    block
     add y z
 
 pp :: [Definition] -> Text
