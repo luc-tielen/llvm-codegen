@@ -21,8 +21,8 @@ import Data.String
 
 
 data Operand
-  = LocalRef { unOperand :: Name }
-  | GlobalRef { unOperand :: Name }
+  = LocalRef Type Name
+  | GlobalRef Type Name
   deriving Show
 
 newtype Name = Name { unName :: Text }
@@ -108,13 +108,18 @@ runModuleBuilderT (ModuleBuilder m) =
 runModuleBuilder :: ModuleBuilder a -> [Definition]
 runModuleBuilder = runIdentity . runModuleBuilderT
 
+typeOf :: Operand -> Type
+typeOf = \case
+  LocalRef ty _ -> ty
+  GlobalRef ty _ -> ty
+
 add :: Monad m => Operand -> Operand -> IRBuilderT m Operand
 add lhs rhs =
-  emitInstr $ Add lhs rhs
+  emitInstr (typeOf lhs) $ Add lhs rhs
 
-emitInstr :: Monad m => IR -> IRBuilderT m Operand
-emitInstr instr = do
-  operand <- mkOperand
+emitInstr :: Monad m => Type -> IR -> IRBuilderT m Operand
+emitInstr ty instr = do
+  operand <- mkOperand ty
   modify (addInstrToCurrentBlock operand)
   pure operand
   where
@@ -160,26 +165,29 @@ fresh = ask >>= \case
     pure $ Name $ unName suggestion <> "_" <> T.pack (show count)
 
 -- NOTE: Only used internally, this creates an unassigned operand
-mkOperand :: Monad m => IRBuilderT m Operand
-mkOperand = do
+mkOperand :: Monad m => Type -> IRBuilderT m Operand
+mkOperand ty = do
   name <- fresh
-  pure $ LocalRef name
+  pure $ LocalRef ty name
 
-data Type = IntType Int
+data Type
+  = IntType Int
+  | FunctionType [Type]  -- TODO return type
+  | PointerType Type
   deriving Show
 
 function :: Monad m => Name -> [Type] -> ([Operand] -> IRBuilderT (ModuleBuilderT m) a) -> ModuleBuilderT m Operand
 function name tys fnBody = do
   instrs <- runIRBuilderT $ do
-    operands <- traverse (const mkOperand) tys
+    operands <- traverse mkOperand tys
     fnBody operands
   modify $ (Function name tys instrs:)
-  pure $ GlobalRef name
+  pure $ GlobalRef (PointerType (FunctionType tys)) name
 
 exampleIR :: [BasicBlock]
 exampleIR = runIRBuilder $ mdo
-  let a = LocalRef "a"
-  let b = LocalRef "b"
+  let a = LocalRef (IntType 32) "a"
+  let b = LocalRef (IntType 32) "b"
   d <- add a c
   c <- add a b
   pure d
@@ -205,7 +213,7 @@ ppDefinition = \case
       ppBody body <> "\n" <>
       "}"
     where
-      ppArg i _argTy = ppOperand $ LocalRef $ Name $ T.pack (show i)
+      ppArg i argTy = ppOperand $ LocalRef argTy $ Name $ T.pack (show i)
       ppBody blocks = T.unlines $ map ppBasicBlock blocks
 
 ppBasicBlock :: BasicBlock -> Text
@@ -220,13 +228,23 @@ ppBasicBlock (BB (Name name) stmts (Terminator term)) =
 
 ppInstr :: IR -> Text
 ppInstr = \case
-  Add a b -> "add " <> ppOperand a <> " " <> ppOperand b
+  Add a b -> "add " <> ppType (typeOf a) <> " " <> ppOperand a <> " " <> ppOperand b
   Ret term ->
     case term of
       Nothing -> "ret void"
       Just operand -> "ret " <> ppOperand operand  -- TODO how to get type info?
 
+ppType :: Type -> Text
+ppType = \case
+  PointerType ty -> ppType ty <> "*"
+  IntType bits -> "i" <> T.pack (show bits)
+  FunctionType argTys -> "TODO " <> fold (L.intersperse ", " $ map ppType argTys)  -- TODO fix return type
+
 ppOperand :: Operand -> Text
-ppOperand op = "%" <> unName (unOperand op)
+ppOperand op = "%" <> unName opName
+  where
+    opName = case op of
+      LocalRef _ name -> name
+      GlobalRef _ name -> name
 
 -- $> putStrLn . Data.Text.unpack $ pp exampleModule
