@@ -89,19 +89,23 @@ data Definition = Function Name [Type] [BasicBlock]
 
 type ModuleBuilderState = [Definition]
 
--- TODO transformer
-newtype ModuleBuilder a
-  = ModuleBuilder (State ModuleBuilderState a)
+newtype ModuleBuilderT m a
+  = ModuleBuilder (StateT ModuleBuilderState m a)
   deriving (Functor, Applicative, Monad, MonadState ModuleBuilderState, MonadFix)
-  via State ModuleBuilderState
+  via StateT ModuleBuilderState m
+
+type ModuleBuilder = ModuleBuilderT Identity
+
+runModuleBuilderT :: Monad m => ModuleBuilderT m a -> m [Definition]
+runModuleBuilderT (ModuleBuilder m) =
+  execStateT m []
 
 runModuleBuilder :: ModuleBuilder a -> [Definition]
-runModuleBuilder (ModuleBuilder m) =
-  execState m []
-
+runModuleBuilder = runIdentity . runModuleBuilderT
 
 add :: Monad m => Operand -> Operand -> IRBuilderT m Operand
-add lhs rhs = emitInstr $ Add lhs rhs
+add lhs rhs =
+  emitInstr $ Add lhs rhs
 
 emitInstr :: Monad m => IR -> IRBuilderT m Operand
 emitInstr instr = do
@@ -137,7 +141,7 @@ block = do
 data Type = IntType Int
   deriving Show
 
-function :: Name -> [Type] -> ([Operand] -> IRBuilderT ModuleBuilder a) -> ModuleBuilder Operand
+function :: Monad m => Name -> [Type] -> ([Operand] -> IRBuilderT (ModuleBuilderT m) a) -> ModuleBuilderT m Operand
 function lbl@(Name name) tys fnBody = do
   instrs <- runIRBuilderT $ do
     operands <- traverse (const mkOperand) tys
@@ -165,7 +169,7 @@ exampleModule = runModuleBuilder $ do
 
 pp :: [Definition] -> Text
 pp defs =
-  mconcat $ L.intersperse "\n" $ map ppDefinition defs
+  T.unlines $ map ppDefinition defs
 
 ppDefinition :: Definition -> Text
 ppDefinition = \case
@@ -175,14 +179,14 @@ ppDefinition = \case
       "}"
     where
       ppArg i _argTy = ppOperand $ Operand $ "%" <> T.pack (show i)
-      ppBody blocks = fold $ L.intersperse "\n" $ map ppBasicBlock blocks
+      ppBody blocks = T.unlines $ map ppBasicBlock blocks
 
 ppBasicBlock :: BasicBlock -> Text
 ppBasicBlock (BB (Name name) stmts (Terminator term)) =
   T.unlines
   [ name <> ":"
-    , T.intercalate "\n" $ map (uncurry ppStmt) $ DList.apply stmts []
-    , ppInstr term
+  , T.unlines $ map (uncurry ppStmt) $ DList.apply stmts []
+  , ppInstr term
   ]
   where
     ppStmt operand instr = ppOperand operand <> " = " <> ppInstr instr
