@@ -89,7 +89,7 @@ partialBlockToBasicBlock pb =
 runIRBuilder :: IRBuilder a -> [BasicBlock]
 runIRBuilder = runIdentity . runIRBuilderT
 
-data Definition = Function Name [Type] [BasicBlock]
+data Definition = Function Name Type [Type] [BasicBlock]
   deriving Show
 
 type ModuleBuilderState = [Definition]
@@ -116,6 +116,15 @@ typeOf = \case
 add :: Monad m => Operand -> Operand -> IRBuilderT m Operand
 add lhs rhs =
   emitInstr (typeOf lhs) $ Add lhs rhs
+
+ret :: Monad m => Operand -> IRBuilderT m ()
+ret val =
+  emitTerminator (Terminator (Ret (Just val)))
+
+emitTerminator :: Monad m => Terminator -> IRBuilderT m ()
+emitTerminator term =
+  modify $ \s ->
+    s { currentBlock = (currentBlock s) { pbTerminator = First (Just term) <> pbTerminator (currentBlock s) } }
 
 emitInstr :: Monad m => Type -> IR -> IRBuilderT m Operand
 emitInstr ty instr = do
@@ -172,17 +181,17 @@ mkOperand ty = do
 
 data Type
   = IntType Int
-  | FunctionType [Type]  -- TODO return type
+  | FunctionType Type [Type]
   | PointerType Type
   deriving Show
 
-function :: Monad m => Name -> [Type] -> ([Operand] -> IRBuilderT (ModuleBuilderT m) a) -> ModuleBuilderT m Operand
-function name tys fnBody = do
+function :: Monad m => Name -> [Type] -> Type -> ([Operand] -> IRBuilderT (ModuleBuilderT m) a) -> ModuleBuilderT m Operand
+function name tys retTy fnBody = do
   instrs <- runIRBuilderT $ do
     operands <- traverse mkOperand tys
     fnBody operands
-  modify $ (Function name tys instrs:)
-  pure $ GlobalRef (PointerType (FunctionType tys)) name
+  modify $ (Function name retTy tys instrs:)
+  pure $ GlobalRef (PointerType (FunctionType retTy tys)) name
 
 exampleIR :: [BasicBlock]
 exampleIR = runIRBuilder $ mdo
@@ -194,13 +203,14 @@ exampleIR = runIRBuilder $ mdo
 
 exampleModule :: [Definition]
 exampleModule = runModuleBuilder $ do
-  function (Name "do_add") [IntType 1, IntType 32] $ \[x, y] -> mdo
+  function (Name "do_add") [IntType 1, IntType 32] (IntType 8) $ \[x, y] -> mdo
     z <- add x y
     add x y
 
     block
     _ <- add y z
     add y z
+    ret y
 
 pp :: [Definition] -> Text
 pp defs =
@@ -208,8 +218,8 @@ pp defs =
 
 ppDefinition :: Definition -> Text
 ppDefinition = \case
-  Function (Name name) argTys body ->
-    "define external ccc void @" <> name <> "(" <> fold (L.intersperse ", " (zipWith ppArg [0..] argTys)) <> ")" <> "{\n" <>
+  Function (Name name) retTy argTys body ->
+    "define external ccc " <> ppType retTy <> " @" <> name <> "(" <> fold (L.intersperse ", " (zipWith ppArg [0..] argTys)) <> ")" <> "{\n" <>
       ppBody body <> "\n" <>
       "}"
     where
@@ -231,14 +241,19 @@ ppInstr = \case
   Add a b -> "add " <> ppType (typeOf a) <> " " <> ppOperand a <> " " <> ppOperand b
   Ret term ->
     case term of
-      Nothing -> "ret void"
-      Just operand -> "ret " <> ppOperand operand  -- TODO how to get type info?
+      Nothing ->
+        "ret void"
+      Just operand ->
+        "ret " <> ppType (typeOf operand) <> " " <> ppOperand operand
 
 ppType :: Type -> Text
 ppType = \case
-  PointerType ty -> ppType ty <> "*"
-  IntType bits -> "i" <> T.pack (show bits)
-  FunctionType argTys -> "TODO " <> fold (L.intersperse ", " $ map ppType argTys)  -- TODO fix return type
+  PointerType ty ->
+    ppType ty <> "*"
+  IntType bits ->
+    "i" <> T.pack (show bits)
+  FunctionType retTy argTys ->
+    ppType retTy <> " " <> fold (L.intersperse ", " $ map ppType argTys)
 
 ppOperand :: Operand -> Text
 ppOperand op = "%" <> unName opName
