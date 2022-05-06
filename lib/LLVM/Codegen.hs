@@ -61,7 +61,6 @@ newtype Terminator
 data IRBuilderState
   = IRBuilderState
   { operandCounter :: Counter
-  , blockCounter :: Counter
   , nameMap :: Map Name Int
   , basicBlocks :: DList BasicBlock
   , currentBlock :: PartialBlock
@@ -77,7 +76,7 @@ type IRBuilder = IRBuilderT Identity
 runIRBuilderT :: Monad m => IRBuilderT m a -> m [BasicBlock]
 runIRBuilderT (IRBuilderT m) = do
   let partialBlock = PartialBlock (Name "start") mempty mempty
-      result = fst <$> execRWST m Nothing (IRBuilderState 0 0 mempty mempty partialBlock)
+      result = fst <$> execRWST m Nothing (IRBuilderState 0 mempty mempty partialBlock)
   previousBlocks <- fmap (flip DList.apply mempty . basicBlocks) result
   currentBlk <- fmap currentBlock result
   pure $ previousBlocks ++ [partialBlockToBasicBlock currentBlk]
@@ -142,20 +141,9 @@ block = do
     let currBlock = currentBlock s
         blocks = basicBlocks s
      in s { basicBlocks = DList.snoc blocks (partialBlockToBasicBlock currBlock)
-          , currentBlock = PartialBlock blockName mempty mempty  -- TODO: use counter
+          , currentBlock = PartialBlock blockName mempty mempty
           }
   pure blockName
-
-  -- count <- gets blockCounter
-  -- let blockName = Name $ "block_" <> T.pack (show count)
-  -- modify $ \s ->
-  --   let currBlock = currentBlock s
-  --       blocks = basicBlocks s
-  --    in s { basicBlocks = DList.snoc blocks (partialBlockToBasicBlock currBlock)
-  --         , currentBlock = PartialBlock blockName mempty mempty  -- TODO: use counter
-  --         , blockCounter = count + 1
-  --         }
-  -- pure blockName
 
 -- TODO: turn into separate monad transformer ("NameSupply")
 fresh :: Monad m => IRBuilderT m Name
@@ -200,13 +188,8 @@ exampleModule :: [Definition]
 exampleModule = runModuleBuilder $ do
   function (Name "do_add") [IntType 1, IntType 32] $ \[x, y] -> mdo
     z <- add x y
-    flip named "bla" $ do
-      add x y
-      add x y
-      add x y
+    add x y
 
-    block `named` "does this work?"
-    block
     block
     _ <- add y z
     add y z
