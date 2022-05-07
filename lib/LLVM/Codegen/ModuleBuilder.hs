@@ -3,6 +3,7 @@ module LLVM.Codegen.ModuleBuilder
   , ModuleBuilder
   , runModuleBuilderT
   , runModuleBuilder
+  , Module(..)
   , Definition(..)
   , function
   ) where
@@ -14,6 +15,9 @@ import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.NameSupply
 
+
+data Module
+  = Module [Definition]
 
 data Definition = Function Name Type [Type] [BasicBlock]
   deriving Show
@@ -27,11 +31,11 @@ newtype ModuleBuilderT m a
 
 type ModuleBuilder = ModuleBuilderT Identity
 
-runModuleBuilderT :: Monad m => ModuleBuilderT m a -> m [Definition]
+runModuleBuilderT :: Monad m => ModuleBuilderT m a -> m Module
 runModuleBuilderT (ModuleBuilder m) =
-  execStateT m []
+  Module <$> execStateT m []
 
-runModuleBuilder :: ModuleBuilder a -> [Definition]
+runModuleBuilder :: ModuleBuilder a -> Module
 runModuleBuilder = runIdentity . runModuleBuilderT
 
 

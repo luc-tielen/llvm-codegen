@@ -20,6 +20,11 @@ extra-source-files:
 library
   exposed-modules:
       LLVM.Codegen
+      LLVM.Codegen.IR
+      LLVM.Codegen.IRBuilder
+      LLVM.Codegen.ModuleBuilder
+      LLVM.Codegen.Operand
+      LLVM.Codegen.Type
       LLVM.NameSupply
   other-modules:
       Paths_llvm_codegen
@@ -45,6 +50,7 @@ library
     , containers ==0.*
     , dlist ==1.*
     , mtl ==2.*
+    , prettyprinter ==1.7.1
     , text ==1.*
   default-language: Haskell2010
 
@@ -78,5 +84,6 @@ test-suite llvm-codegen-test
     , hspec-hedgehog ==0.*
     , llvm-codegen
     , mtl ==2.*
+    , prettyprinter ==1.7.1
     , text ==1.*
   default-language: Haskell2010

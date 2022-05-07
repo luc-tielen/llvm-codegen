@@ -17,6 +17,7 @@ dependencies:
   - containers == 0.*
   - mtl == 2.*
   - dlist == 1.*
+  - prettyprinter == 1.7.1
 
 default-extensions:
   - OverloadedStrings
