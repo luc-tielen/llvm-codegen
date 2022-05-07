@@ -30,6 +30,11 @@ data Operand
   | GlobalRef Type Name
   deriving Show
 
+typeOf :: Operand -> Type
+typeOf = \case
+  LocalRef ty _ -> ty
+  GlobalRef ty _ -> ty
+
 data IR
   = Add Operand Operand
   | Ret (Maybe Operand)
@@ -102,11 +107,6 @@ partialBlockToBasicBlock pb =
   let currentTerm = fromMaybe (Terminator $ Ret Nothing) $ getFirst $ pbTerminator pb
   in BB (pbName pb) (pbInstructions pb) currentTerm
 
-emitTerminator :: Monad m => Terminator -> IRBuilderT m ()
-emitTerminator term =
-  modify $ \s ->
-    s { currentBlock = (currentBlock s) { pbTerminator = First (Just term) <> pbTerminator (currentBlock s) } }
-
 -- NOTE: Only used internally, this creates an unassigned operand
 mkOperand :: Monad m => Type -> IRBuilderT m Operand
 mkOperand ty = do
@@ -116,13 +116,22 @@ mkOperand ty = do
 emitInstr :: Monad m => Type -> IR -> IRBuilderT m Operand
 emitInstr ty instr = do
   operand <- mkOperand ty
-  modify (addInstrToCurrentBlock operand)
+  addInstrToCurrentBlock operand
   pure operand
   where
-    addInstrToCurrentBlock operand s =
-      -- TODO: record dot syntax? or create a helper function if this pattern occurs a lot..
-      let instrs = DList.snoc (pbInstructions . currentBlock $ s) (operand, instr)
-       in s { currentBlock = (currentBlock s) { pbInstructions = instrs } }
+    addInstrToCurrentBlock operand =
+      modifyCurrentBlock $ \blk ->
+        let instrs = DList.snoc (pbInstructions blk) (operand, instr)
+         in blk { pbInstructions = instrs }
+
+emitTerminator :: Monad m => Terminator -> IRBuilderT m ()
+emitTerminator term =
+  modifyCurrentBlock $ \blk ->
+    blk { pbTerminator = First (Just term) <> pbTerminator blk }
+
+modifyCurrentBlock :: Monad m => (PartialBlock -> PartialBlock) -> IRBuilderT m ()
+modifyCurrentBlock f =
+  modify $ \s -> s { currentBlock = f (currentBlock s) }
 
 
 data Definition = Function Name Type [Type] [BasicBlock]
@@ -144,10 +153,6 @@ runModuleBuilderT (ModuleBuilder m) =
 runModuleBuilder :: ModuleBuilder a -> [Definition]
 runModuleBuilder = runIdentity . runModuleBuilderT
 
-typeOf :: Operand -> Type
-typeOf = \case
-  LocalRef ty _ -> ty
-  GlobalRef ty _ -> ty
 
 add :: Monad m => Operand -> Operand -> IRBuilderT m Operand
 add lhs rhs =
@@ -175,7 +180,6 @@ exampleModule = runModuleBuilder $ do
     _ <- block
     _ <- add y z
     ret y
-
 
 
 pp :: [Definition] -> Text
