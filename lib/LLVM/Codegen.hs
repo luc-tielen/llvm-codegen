@@ -5,40 +5,39 @@ module LLVM.Codegen
   ( module LLVM.Codegen  -- TODO clean up exports
   ) where
 
-import Control.Monad.State.Lazy
-import Control.Monad.RWS.Lazy
+import Control.Monad.State
+import Control.Monad.Reader
 import Data.Functor.Identity
-import Data.Foldable
-import Data.Maybe
-import qualified Data.Text as T
-import qualified Data.List as L
-import qualified Data.Map as M
-import Data.Map (Map)
-import Data.Text (Text)
 import qualified Data.DList as DList
+import qualified Data.List as L
+import Data.Text (Text)
+import qualified Data.Text as T
 import Data.DList (DList)
-import Data.String
+import Data.Foldable
+import Data.Monoid
+import Data.Maybe
+import LLVM.NameSupply
 
+
+data Type
+  = IntType Int
+  | FunctionType Type [Type]
+  | PointerType Type
+  deriving Show
 
 data Operand
   = LocalRef Type Name
   | GlobalRef Type Name
   deriving Show
 
-newtype Name = Name { unName :: Text }
-  deriving (Eq, Ord, Show)
-
-instance IsString Name where
-  fromString = Name . fromString
-
-
 data IR
   = Add Operand Operand
   | Ret (Maybe Operand)
   deriving Show
 
-
-type Counter = Int
+newtype Terminator
+  = Terminator IR
+  deriving Show
 
 data BasicBlock
   = BB
@@ -54,40 +53,77 @@ data PartialBlock
   , pbTerminator :: First Terminator
   }
 
-newtype Terminator
-  = Terminator IR
-  deriving Show
-
 data IRBuilderState
   = IRBuilderState
-  { operandCounter :: Counter
-  , nameMap :: Map Name Int
-  , basicBlocks :: DList BasicBlock
+  { basicBlocks :: DList BasicBlock
   , currentBlock :: PartialBlock
   }
 
 newtype IRBuilderT m a
-  = IRBuilderT (RWST (Maybe Name) () IRBuilderState m a)
-  deriving (Functor, Applicative, Monad, MonadReader (Maybe Name), MonadState IRBuilderState, MonadFix)
-  via RWST (Maybe Name) () IRBuilderState m
+  = IRBuilderT (StateT IRBuilderState (NameSupplyT m) a)
+  deriving ( Functor, Applicative, Monad, MonadFix
+           , MonadReader (Maybe Name), MonadState IRBuilderState
+           , MonadNameSupply
+           )
+  via StateT IRBuilderState (NameSupplyT m)
 
 type IRBuilder = IRBuilderT Identity
 
 runIRBuilderT :: Monad m => IRBuilderT m a -> m [BasicBlock]
 runIRBuilderT (IRBuilderT m) = do
   let partialBlock = PartialBlock (Name "start") mempty mempty
-      result = fst <$> execRWST m Nothing (IRBuilderState 0 mempty mempty partialBlock)
+      result = runNameSupplyT $ execStateT m (IRBuilderState mempty partialBlock)
   previousBlocks <- fmap (flip DList.apply mempty . basicBlocks) result
   currentBlk <- fmap currentBlock result
   pure $ previousBlocks ++ [partialBlockToBasicBlock currentBlk]
+
+runIRBuilder :: IRBuilder a -> [BasicBlock]
+runIRBuilder = runIdentity . runIRBuilderT
+
+block :: Monad m => IRBuilderT m Name
+block = do
+  blockName <- ask >>= \case
+    Nothing -> do
+      name <- fresh
+      pure $ Name $ "block_" <> unName name
+    Just _sugg ->
+      fresh
+
+  modify $ \s ->
+    let currBlock = currentBlock s
+        blocks = basicBlocks s
+     in s { basicBlocks = DList.snoc blocks (partialBlockToBasicBlock currBlock)
+          , currentBlock = PartialBlock blockName mempty mempty
+          }
+  pure blockName
 
 partialBlockToBasicBlock :: PartialBlock -> BasicBlock
 partialBlockToBasicBlock pb =
   let currentTerm = fromMaybe (Terminator $ Ret Nothing) $ getFirst $ pbTerminator pb
   in BB (pbName pb) (pbInstructions pb) currentTerm
 
-runIRBuilder :: IRBuilder a -> [BasicBlock]
-runIRBuilder = runIdentity . runIRBuilderT
+emitTerminator :: Monad m => Terminator -> IRBuilderT m ()
+emitTerminator term =
+  modify $ \s ->
+    s { currentBlock = (currentBlock s) { pbTerminator = First (Just term) <> pbTerminator (currentBlock s) } }
+
+-- NOTE: Only used internally, this creates an unassigned operand
+mkOperand :: Monad m => Type -> IRBuilderT m Operand
+mkOperand ty = do
+  name <- fresh
+  pure $ LocalRef ty name
+
+emitInstr :: Monad m => Type -> IR -> IRBuilderT m Operand
+emitInstr ty instr = do
+  operand <- mkOperand ty
+  modify (addInstrToCurrentBlock operand)
+  pure operand
+  where
+    addInstrToCurrentBlock operand s =
+      -- TODO: record dot syntax? or create a helper function if this pattern occurs a lot..
+      let instrs = DList.snoc (pbInstructions . currentBlock $ s) (operand, instr)
+       in s { currentBlock = (currentBlock s) { pbInstructions = instrs } }
+
 
 data Definition = Function Name Type [Type] [BasicBlock]
   deriving Show
@@ -121,70 +157,6 @@ ret :: Monad m => Operand -> IRBuilderT m ()
 ret val =
   emitTerminator (Terminator (Ret (Just val)))
 
-emitTerminator :: Monad m => Terminator -> IRBuilderT m ()
-emitTerminator term =
-  modify $ \s ->
-    s { currentBlock = (currentBlock s) { pbTerminator = First (Just term) <> pbTerminator (currentBlock s) } }
-
-emitInstr :: Monad m => Type -> IR -> IRBuilderT m Operand
-emitInstr ty instr = do
-  operand <- mkOperand ty
-  modify (addInstrToCurrentBlock operand)
-  pure operand
-  where
-    addInstrToCurrentBlock operand s =
-      -- TODO: record dot syntax? or create a helper function if this pattern occurs a lot..
-      let instrs = DList.snoc (pbInstructions . currentBlock $ s) (operand, instr)
-       in s { currentBlock = (currentBlock s) { pbInstructions = instrs } }
-
--- TODO: use local, and create fresh + use from mkOperand
-named :: Monad m => IRBuilderT m a -> Name -> IRBuilderT m a
-m `named` name = local (const $ Just name) m
-
-block :: Monad m => IRBuilderT m Name
-block = do
-  let freshBlockName = ask >>= \case
-        Nothing -> do
-          name <- fresh
-          pure $ Name $ "block_" <> unName name
-        Just _sugg ->
-          fresh
-  blockName <- freshBlockName
-
-  modify $ \s ->
-    let currBlock = currentBlock s
-        blocks = basicBlocks s
-     in s { basicBlocks = DList.snoc blocks (partialBlockToBasicBlock currBlock)
-          , currentBlock = PartialBlock blockName mempty mempty
-          }
-  pure blockName
-
--- TODO: turn into separate monad transformer ("NameSupply")
-fresh :: Monad m => IRBuilderT m Name
-fresh = ask >>= \case
-  Nothing -> do
-    count <- gets operandCounter
-    modify $ \s -> s { operandCounter = count + 1 }
-    pure $ Name $ T.pack (show count)
-  Just suggestion -> do
-    nameMapping <- gets nameMap
-    let mCount = M.lookup suggestion nameMapping
-        count = fromMaybe 0 mCount
-    modify $ \s -> s { nameMap = M.insert suggestion (count + 1) nameMapping }
-    pure $ Name $ unName suggestion <> "_" <> T.pack (show count)
-
--- NOTE: Only used internally, this creates an unassigned operand
-mkOperand :: Monad m => Type -> IRBuilderT m Operand
-mkOperand ty = do
-  name <- fresh
-  pure $ LocalRef ty name
-
-data Type
-  = IntType Int
-  | FunctionType Type [Type]
-  | PointerType Type
-  deriving Show
-
 function :: Monad m => Name -> [Type] -> Type -> ([Operand] -> IRBuilderT (ModuleBuilderT m) a) -> ModuleBuilderT m Operand
 function name tys retTy fnBody = do
   instrs <- runIRBuilderT $ do
@@ -193,24 +165,18 @@ function name tys retTy fnBody = do
   modify $ (Function name retTy tys instrs:)
   pure $ GlobalRef (PointerType (FunctionType retTy tys)) name
 
-exampleIR :: [BasicBlock]
-exampleIR = runIRBuilder $ mdo
-  let a = LocalRef (IntType 32) "a"
-  let b = LocalRef (IntType 32) "b"
-  d <- add a c
-  c <- add a b
-  pure d
 
 exampleModule :: [Definition]
 exampleModule = runModuleBuilder $ do
   function (Name "do_add") [IntType 1, IntType 32] (IntType 8) $ \[x, y] -> mdo
     z <- add x y
-    add x y
+    _ <- add x y
 
-    block
+    _ <- block
     _ <- add y z
-    add y z
     ret y
+
+
 
 pp :: [Definition] -> Text
 pp defs =

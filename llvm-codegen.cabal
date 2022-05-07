@@ -20,6 +20,7 @@ extra-source-files:
 library
   exposed-modules:
       LLVM.Codegen
+      LLVM.NameSupply
   other-modules:
       Paths_llvm_codegen
   hs-source-dirs:
