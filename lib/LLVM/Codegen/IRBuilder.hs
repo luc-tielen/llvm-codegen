@@ -24,6 +24,7 @@ import LLVM.NameSupply
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Codegen.IR
+import LLVM.Pretty
 
 
 data BasicBlock
@@ -125,4 +126,13 @@ add lhs rhs =
 ret :: Monad m => Operand -> IRBuilderT m ()
 ret val =
   emitTerminator (Terminator (Ret (Just val)))
+
+
+instance Pretty BasicBlock where
+  pretty (BB (Name name) stmts (Terminator term)) =
+    let prettyStmts = indent 2 $ vsep $ (map (uncurry prettyStmt) $ DList.apply stmts []) ++ [pretty term]
+     in vsep [ pretty name <> ":", prettyStmts ]
+    where
+      prettyStmt operand instr =
+        pretty operand <+> "=" <+> pretty instr
 

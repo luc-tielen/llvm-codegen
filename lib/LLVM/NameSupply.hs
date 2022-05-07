@@ -15,6 +15,7 @@ import qualified Data.Map as M
 import Data.Text (Text)
 import Data.Map (Map)
 import Data.Maybe
+import LLVM.Pretty
 
 
 newtype Name = Name { unName :: Text }
@@ -61,3 +62,7 @@ instance MonadNameSupply m => MonadNameSupply (StateT s m) where
   fresh = lift fresh
   named = flip $ (mapStateT . flip named)
 
+
+instance Pretty Name where
+  pretty (Name name) =
+    pretty name

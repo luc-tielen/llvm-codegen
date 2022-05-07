@@ -4,6 +4,7 @@ module LLVM.Codegen.IR
   ) where
 
 import LLVM.Codegen.Operand
+import LLVM.Pretty
 
 
 data IR
@@ -14,4 +15,16 @@ data IR
 newtype Terminator
   = Terminator IR
   deriving Show
+
+
+instance Pretty IR where
+  pretty = \case
+    Add a b ->
+      "add" <+> pretty (typeOf a) <+> pretty a <+> pretty b
+    Ret term ->
+      case term of
+        Nothing ->
+          "ret void"
+        Just operand ->
+          "ret " <> pretty (typeOf operand) <+> pretty operand
 
