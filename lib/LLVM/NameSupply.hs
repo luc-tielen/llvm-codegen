@@ -1,3 +1,4 @@
+-- TODO: move to Codegen folder
 module LLVM.NameSupply
   ( Name(..)
   , Counter
@@ -6,7 +7,6 @@ module LLVM.NameSupply
   , runNameSupplyT
   , MonadNameSupply(..)
   ) where
-
 
 import Control.Monad.RWS.Lazy
 import Control.Monad.State.Lazy
