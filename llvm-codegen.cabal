@@ -26,6 +26,7 @@ library
       LLVM.Codegen.Operand
       LLVM.Codegen.Type
       LLVM.NameSupply
+      LLVM.Pretty
   other-modules:
       Paths_llvm_codegen
   hs-source-dirs:

@@ -10,9 +10,22 @@ module LLVM.Codegen.IRBuilder
   , runIRBuilder
 
   , add
+  , mul
+  , sub
+  , udiv
+  , and
+  , trunc
+  , zext
+  , ptrtoint
+  , bitcast
   , ret
+  , retVoid
+  , br
+  , condBr
+  -- , switch  TODO
   ) where
 
+import Prelude hiding (and)
 import Control.Monad.State
 import Control.Monad.Reader
 import Data.Functor.Identity
@@ -121,12 +134,58 @@ modifyCurrentBlock f =
 
 add :: Monad m => Operand -> Operand -> IRBuilderT m Operand
 add lhs rhs =
-  emitInstr (typeOf lhs) $ Add lhs rhs
+  emitInstr (typeOf lhs) $ Add False False lhs rhs
+
+mul :: Monad m => Operand -> Operand -> IRBuilderT m Operand
+mul lhs rhs =
+  emitInstr (typeOf lhs) $ Mul False False lhs rhs
+
+sub :: Monad m => Operand -> Operand -> IRBuilderT m Operand
+sub lhs rhs =
+  emitInstr (typeOf lhs) $ Sub False False lhs rhs
+
+udiv :: Monad m => Operand -> Operand -> IRBuilderT m Operand
+udiv lhs rhs =
+  emitInstr (typeOf lhs) $ Udiv False lhs rhs
+
+and :: Monad m => Operand -> Operand -> IRBuilderT m Operand
+and lhs rhs =
+  emitInstr (typeOf lhs) $ And lhs rhs
+
+trunc :: Monad m => Operand -> Type -> IRBuilderT m Operand
+trunc val ty =
+  emitInstr (typeOf val) $ Trunc val ty
+
+zext :: Monad m => Operand -> Type -> IRBuilderT m Operand
+zext val ty =
+  emitInstr (typeOf val) $ Zext val ty
+
+ptrtoint :: Monad m => Operand -> Type -> IRBuilderT m Operand
+ptrtoint val ty =
+  emitInstr (typeOf val) $ PtrToInt val ty
+
+bitcast :: Monad m => Operand -> Type -> IRBuilderT m Operand
+bitcast val ty =
+  emitInstr (typeOf val) $ Bitcast val ty
 
 ret :: Monad m => Operand -> IRBuilderT m ()
 ret val =
   emitTerminator (Terminator (Ret (Just val)))
 
+retVoid :: Monad m => IRBuilderT m ()
+retVoid =
+  emitTerminator (Terminator (Ret Nothing))
+
+br :: Monad m => Name -> IRBuilderT m ()
+br label =
+  emitTerminator (Terminator (Br label))
+
+condBr :: Monad m => Operand -> Name -> Name -> IRBuilderT m ()
+condBr cond trueLabel falseLabel =
+  emitTerminator (Terminator (CondBr cond trueLabel falseLabel))
+
+-- switch :: Monad m => _ -> IRBuilderT m ()
+-- switch = _
 
 instance Pretty BasicBlock where
   pretty (BB (Name name) stmts (Terminator term)) =
