@@ -1,16 +1,41 @@
 module LLVM.Codegen.IR
   ( IR(..)
   , Terminator(..)
+  , SynchronizationScope(..)
+  , MemoryOrdering(..)
   ) where
 
+import qualified Data.List as L
 import LLVM.NameSupply  -- TODO: separate import for name
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Pretty
+import Data.Word
 
+-- TODO: create Flag datatype
 type NUW = Bool
 type NSW = Bool
 type Exact = Bool
+type Inbounds = Bool
+type Volatile = Bool
+
+type Alignment = Word32
+
+data SynchronizationScope
+  = SingleThread
+  | System
+  deriving Show
+
+data MemoryOrdering
+  = Unordered
+  | Monotonic
+  | Acquire
+  | Release
+  | AcquireRelease
+  | SequentiallyConsistent
+  deriving Show
+
+type Atomicity = (SynchronizationScope, MemoryOrdering)
 
 data IR
   = Add NUW NSW Operand Operand
@@ -22,6 +47,9 @@ data IR
   | Zext Operand Type
   | Bitcast Operand Type
   | PtrToInt Operand Type
+  | Alloca Type (Maybe Operand) Int
+  | GetElementPtr Inbounds Operand [Operand]
+  | Store Volatile Operand Operand (Maybe Atomicity) Alignment
   -- Terminators
   | Ret (Maybe Operand)
   | Br Name
@@ -43,7 +71,7 @@ instance Pretty IR where
     Sub nuw nsw a b ->
       prettyArithBinOp "sub" nuw nsw a b
     Udiv exact a b ->
-      "udiv" <+> prettyFlag "exact" exact <> pretty (typeOf a) <+> pretty a <> "," <+> pretty b
+      "udiv" <+> optional exact "exact" <> pretty (typeOf a) <+> pretty a <> "," <+> pretty b
     And a b ->
       "and" <+> pretty (typeOf a) <+> pretty a <> "," <+> pretty b
     Trunc val to ->
@@ -54,6 +82,29 @@ instance Pretty IR where
       prettyConvertOp "bitcast" val to
     PtrToInt val to ->
       prettyConvertOp "ptrtoint" val to
+    Alloca ty numElems alignment ->
+      "alloca" <+> pretty ty <+> maybeDoc numElems (\count -> "," <+> pretty (typeOf count) <+> pretty count)
+                             <+> ", align" <+> pretty alignment
+    GetElementPtr inbounds pointer indices ->
+      case typeOf pointer of
+        ty@(PointerType innerTy) ->
+          "getelementptr" <+> optional inbounds "inbounds" <> pretty innerTy <> "," <> pretty ty <+>
+            pretty pointer <> "," <+> (mconcat $ L.intersperse ", " $ map prettyIndex indices)
+        _ ->
+          error "Operand given to `getelementptr` that is not a pointer!"
+      where
+        prettyIndex i = pretty (typeOf i) <+> pretty i
+    Store volatile addr value atomicity alignment ->
+      let ty = typeOf value
+          ptrTy = PointerType ty
+          alignDoc = if alignment == 0 then mempty else ", align" <+> pretty alignment
+       in case atomicity of
+            Nothing ->
+              "store" <+> optional volatile "volatile" <> pretty ty <+> pretty value <> "," <+>
+                pretty ptrTy <+> pretty addr <> alignDoc
+            Just (syncScope, memoryOrdering) ->
+              "store atomic" <+> optional volatile "volatile" <> pretty ty <+> pretty value <> "," <+>
+                pretty ptrTy <+> pretty addr <+> pretty syncScope <+> pretty memoryOrdering <> alignDoc
     Ret term ->
       case term of
         Nothing ->
@@ -71,15 +122,33 @@ instance Pretty IR where
         prettyCase (caseTy, caseVal, label) =
           pretty caseTy <+> pretty caseVal <> ", label" <+> pretty label
 
+instance Pretty SynchronizationScope where
+  pretty = \case
+    SingleThread ->
+      "syncscope(" <> dquotes "singlethread" <> ")"
+    System -> mempty
+
+instance Pretty MemoryOrdering where
+  pretty = \case
+    Unordered              -> "unordered"
+    Monotonic              -> "monotonic"
+    Acquire                -> "acquire"
+    Release                -> "release"
+    AcquireRelease         -> "acq_rel"
+    SequentiallyConsistent -> "seq_cst"
+
 prettyArithBinOp :: Doc ann -> Bool -> Bool -> Operand -> Operand -> Doc ann
 prettyArithBinOp opName nuw nsw a b =
-  opName <+> prettyFlag "nuw" nuw <> prettyFlag "nsw" nsw <> pretty (typeOf a) <+> pretty a <> "," <+> pretty b
+  opName <+> optional nuw "nuw" <> optional nsw "nsw" <> pretty (typeOf a) <+> pretty a <> "," <+> pretty b
 
 prettyConvertOp :: Doc ann -> Operand -> Type -> Doc ann
 prettyConvertOp opName val to =
   opName <+> pretty (typeOf val) <+> "to" <+> pretty to
 
-prettyFlag :: Doc ann -> Bool -> Doc ann
-prettyFlag doc = \case
-  False -> ""
+optional :: Bool -> Doc ann -> Doc ann
+optional b doc = case b of
+  False -> mempty
   True -> doc <> " "
+
+maybeDoc :: Maybe a -> (a -> Doc ann) -> Doc ann
+maybeDoc = flip (maybe mempty)

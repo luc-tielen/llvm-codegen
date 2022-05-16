@@ -4,6 +4,7 @@ module LLVM.Codegen.IRBuilder
   , block
   , named
   , emitInstr
+  , emitInstrVoid
   , emitTerminator
   , BasicBlock(..)
   , runIRBuilderT
@@ -18,6 +19,10 @@ module LLVM.Codegen.IRBuilder
   , zext
   , ptrtoint
   , bitcast
+  , alloca
+  , gep
+  , load
+  , store
   , ret
   , retVoid
   , br
@@ -26,6 +31,7 @@ module LLVM.Codegen.IRBuilder
   ) where
 
 import Prelude hiding (and)
+import GHC.Stack
 import Control.Monad.State
 import Control.Monad.Reader
 import Data.Functor.Identity
@@ -33,24 +39,25 @@ import qualified Data.DList as DList
 import Data.DList (DList)
 import Data.Monoid
 import Data.Maybe
+import Data.Word
 import LLVM.NameSupply
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Codegen.IR
-import LLVM.Pretty
+import LLVM.Pretty hiding (align)
 
 
 data BasicBlock
   = BB
   { bbName :: Name
-  , bbInstructions :: DList (Operand, IR)
+  , bbInstructions :: DList (Maybe Operand, IR)
   , bbTerminator :: Terminator
   } deriving Show
 
 data PartialBlock
   = PartialBlock
   { pbName :: Name
-  , pbInstructions :: DList (Operand, IR)
+  , pbInstructions :: DList (Maybe Operand, IR)
   , pbTerminator :: First Terminator
   }
 
@@ -112,13 +119,18 @@ mkOperand ty = do
 emitInstr :: Monad m => Type -> IR -> IRBuilderT m Operand
 emitInstr ty instr = do
   operand <- mkOperand ty
-  addInstrToCurrentBlock operand
+  addInstrToCurrentBlock (Just operand) instr
   pure operand
-  where
-    addInstrToCurrentBlock operand =
-      modifyCurrentBlock $ \blk ->
-        let instrs = DList.snoc (pbInstructions blk) (operand, instr)
-         in blk { pbInstructions = instrs }
+
+emitInstrVoid :: Monad m => IR -> IRBuilderT m ()
+emitInstrVoid instr =
+  addInstrToCurrentBlock Nothing instr
+
+addInstrToCurrentBlock :: Monad m => Maybe Operand -> IR -> IRBuilderT m ()
+addInstrToCurrentBlock operand instr =
+  modifyCurrentBlock $ \blk ->
+    let instrs = DList.snoc (pbInstructions blk) (operand, instr)
+      in blk { pbInstructions = instrs }
 
 emitTerminator :: Monad m => Terminator -> IRBuilderT m ()
 emitTerminator term =
@@ -168,6 +180,48 @@ bitcast :: Monad m => Operand -> Type -> IRBuilderT m Operand
 bitcast val ty =
   emitInstr (typeOf val) $ Bitcast val ty
 
+alloca :: Monad m => Type -> (Maybe Operand) -> Int -> IRBuilderT m Operand
+alloca ty numElems alignment =
+  emitInstr ty $ Alloca ty numElems alignment
+
+gep :: (HasCallStack, Monad m) => Operand -> [Operand] -> IRBuilderT m Operand
+gep operand indices = do
+  let resultType = computeGepType (typeOf operand) indices
+  case resultType of
+    Left err -> error err -- TODO
+    Right ty ->
+      emitInstr ty $ GetElementPtr False operand indices
+
+load :: Monad m => Operand -> Word32 -> IRBuilderT m Operand
+load addr align =
+  undefined -- TODO
+
+store :: Monad m => Operand -> Word32 -> Operand -> IRBuilderT m ()
+store addr align value =
+  emitInstrVoid $ Store False addr value Nothing align
+
+computeGepType :: HasCallStack => Type -> [Operand] -> Either String Type
+computeGepType ty [] = Right $ PointerType ty
+computeGepType (PointerType ty) (_:is) = computeGepType ty is
+computeGepType ty _ =
+  Left $ "Expecting aggregate type. (Malformed AST): " <> show ty
+
+  {-
+TODO: add support for structs, arrays, ...
+indexTypeByOperands :: (HasCallStack, MonadModuleBuilder m) => Type -> [Operand] -> m (Either String Type)
+indexTypeByOperands (StructureType _ elTys) (ConstantOperand (C.Int 32 val):is) =
+  indexTypeByOperands (elTys !! fromIntegral val) is
+indexTypeByOperands (StructureType _ _) (i:_) =
+  return $ Left $ "Indices into structures should be 32-bit integer constants. (Malformed AST): " ++ show i
+indexTypeByOperands (VectorType _ elTy) (_:is) = indexTypeByOperands elTy is
+indexTypeByOperands (ArrayType _ elTy) (_:is) = indexTypeByOperands elTy is
+indexTypeByOperands (NamedTypeReference n) is = do
+  mayTy <- liftModuleState (gets (Map.lookup n . builderTypeDefs))
+  case mayTy of
+    Nothing -> return $ Left $ "Couldn’t resolve typedef for: " ++ show n
+    Just ty -> indexTypeByOperands ty is
+    -}
+
 ret :: Monad m => Operand -> IRBuilderT m ()
 ret val =
   emitTerminator (Terminator (Ret (Just val)))
@@ -193,5 +247,6 @@ instance Pretty BasicBlock where
      in vsep [ pretty name <> ":", prettyStmts ]
     where
       prettyStmt operand instr =
-        pretty operand <+> "=" <+> pretty instr
+        let instrDoc = pretty instr
+         in maybe instrDoc (\op -> pretty op <+> "=" <+> instrDoc) operand
 
