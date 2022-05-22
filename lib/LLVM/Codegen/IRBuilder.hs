@@ -28,6 +28,7 @@ module LLVM.Codegen.IRBuilder
   , br
   , condBr
   -- , switch  TODO
+  , select
   ) where
 
 import Prelude hiding (and)
@@ -240,6 +241,10 @@ condBr cond trueLabel falseLabel =
 
 -- switch :: Monad m => _ -> IRBuilderT m ()
 -- switch = _
+
+select :: Monad m => Operand -> Operand -> Operand -> IRBuilderT m Operand
+select c t f =
+  emitInstr (typeOf t) $ Select c t f
 
 instance Pretty BasicBlock where
   pretty (BB (Name name) stmts (Terminator term)) =

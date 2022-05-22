@@ -18,6 +18,7 @@ type NSW = Bool
 type Exact = Bool
 type Inbounds = Bool
 type Volatile = Bool
+type FastMath = Bool
 
 type Alignment = Word32
 
@@ -55,6 +56,7 @@ data IR
   | Br Name
   | CondBr Operand Name Name
   | Switch Type Operand Name [(Type, Operand, Name)]
+  | Select Operand Operand Operand
   deriving Show
 
 newtype Terminator
@@ -121,6 +123,10 @@ instance Pretty IR where
       where
         prettyCase (caseTy, caseVal, label) =
           pretty caseTy <+> pretty caseVal <> ", label" <+> pretty label
+    Select c t f ->
+      "select" <+> pretty (typeOf c) <+> pretty c <> "," <+>
+        pretty (typeOf t) <+> pretty t <> "," <+>
+        pretty (typeOf f) <+> pretty f
 
 instance Pretty SynchronizationScope where
   pretty = \case

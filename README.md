@@ -35,7 +35,7 @@ A Haskell library for generating LLVM code. Inspired by the `llvm-hs`,
   - [ ] call
   - [x] ret
   - [ ] switch
-  - [ ] select
+  - [x] select
   - [x] condBr
   - ... (add as needed)
 - [ ] Add combinators for commonly used control flow constructs
