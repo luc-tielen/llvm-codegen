@@ -25,6 +25,7 @@ module LLVM.Codegen.IRBuilder
   , load
   , store
   , phi
+  , call
   , ret
   , retVoid
   , br
@@ -237,6 +238,12 @@ indexTypeByOperands (NamedTypeReference n) is = do
     Nothing -> return $ Left $ "Couldn’t resolve typedef for: " ++ show n
     Just ty -> indexTypeByOperands ty is
     -}
+
+call :: Monad m => Operand -> [Operand] -> IRBuilderT m Operand
+call fn args = case typeOf fn of
+  FunctionType retTy _ ->
+    emitInstr retTy $ Call Nothing C fn args
+  _ -> error "Malformed AST, expected function type in 'call' instruction"
 
 ret :: Monad m => Operand -> IRBuilderT m ()
 ret val =

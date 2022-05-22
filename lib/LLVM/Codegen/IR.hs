@@ -2,6 +2,8 @@ module LLVM.Codegen.IR
   ( IR(..)
   , Terminator(..)
   , ComparisonType(..)
+  , CallingConvention(..)
+  , TailCallAttribute(..)
   , SynchronizationScope(..)
   , MemoryOrdering(..)
   ) where
@@ -53,6 +55,16 @@ data ComparisonType
   | SLE
   deriving (Eq, Show)
 
+data TailCallAttribute
+  = Tail | MustTail | NoTail
+  deriving Show
+
+data CallingConvention
+  = C
+  | Fast
+  -- TODO add others as needed
+  deriving Show
+
 data IR
   = Add NUW NSW Operand Operand
   | Mul NUW NSW Operand Operand
@@ -68,6 +80,7 @@ data IR
   | GetElementPtr Inbounds Operand [Operand]
   | Store Volatile Operand Operand (Maybe Atomicity) Alignment
   | Phi (NonEmpty (Operand, Name))
+  | Call (Maybe TailCallAttribute) CallingConvention Operand [Operand]  -- TODO support param attributes
   -- Terminators
   | Ret (Maybe Operand)
   | Br Name
@@ -131,6 +144,16 @@ instance Pretty IR where
       where
         prettyPhiCase (value, name) =
           brackets $ pretty value <> "," <+> pretty name
+    Call tcAttr cc fn args ->
+      tcDoc <> "call" <+> pretty cc <+> pretty resultType <+> pretty fn <+> prettyArgs
+      where
+        resultType = case typeOf fn of
+          FunctionType retTy _ -> retTy
+          _ -> error "Malformed AST, expected function type."
+        tcDoc = maybeDoc tcAttr (\tc -> pretty tc <> " ")
+        prettyArgs = parens $ mconcat $ L.intersperse ", " $ map prettyArg args
+        prettyArg arg =
+          pretty (typeOf arg) <+> pretty arg
     Ret term ->
       case term of
         Nothing ->
@@ -151,6 +174,17 @@ instance Pretty IR where
       "select" <+> pretty (typeOf c) <+> pretty c <> "," <+>
         pretty (typeOf t) <+> pretty t <> "," <+>
         pretty (typeOf f) <+> pretty f
+
+instance Pretty TailCallAttribute where
+  pretty = \case
+    Tail -> "tail"
+    NoTail -> "notail"
+    MustTail -> "musttail"
+
+instance Pretty CallingConvention where
+  pretty = \case
+    C -> "ccc"
+    Fast -> "fastcc"
 
 instance Pretty ComparisonType where
   pretty = \case

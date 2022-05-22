@@ -32,7 +32,7 @@ A Haskell library for generating LLVM code. Inspired by the `llvm-hs`,
   - [x] br
   - [x] phi
   - [x] retVoid
-  - [ ] call
+  - [x] call
   - [x] ret
   - [x] switch
   - [x] select
