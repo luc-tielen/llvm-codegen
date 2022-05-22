@@ -8,11 +8,14 @@ module LLVM.Codegen.ModuleBuilder
   , Definition(..)
   , function
   , global
+  , typedef
   ) where
 
 import Control.Monad.State
 import Data.DList (DList)
+import Data.Map (Map)
 import qualified Data.DList as DList
+import qualified Data.Map as Map
 import qualified Data.Text as T
 import Data.Functor.Identity
 import LLVM.Codegen.IRBuilder
@@ -36,12 +39,15 @@ data Global
 
 data Definition
   = GlobalDefinition Global
+  | TypeDefinition Name Type
   deriving Show
 
 instance Pretty Definition where
  pretty = \case
    GlobalDefinition g ->
      pretty g
+   TypeDefinition name ty ->
+     "%" <> pretty name <+> "=" <+> pretty ty
 
 instance Pretty Global where
   pretty = \case
@@ -58,7 +64,11 @@ instance Pretty Global where
         prettyArg i argTy = pretty $ LocalRef argTy $ Name $ T.pack (show i)
         prettyBody blocks = vsep $ map pretty blocks
 
-type ModuleBuilderState = DList Definition
+data ModuleBuilderState
+  = ModuleBuilderState
+  { definitions :: DList Definition
+  , types :: Map Name Type
+  }
 
 newtype ModuleBuilderT m a
   = ModuleBuilder (StateT ModuleBuilderState m a)
@@ -71,7 +81,9 @@ type MonadModuleBuilder m = (MonadState ModuleBuilderState m, MonadFix m)
 
 runModuleBuilderT :: Monad m => ModuleBuilderT m a -> m Module
 runModuleBuilderT (ModuleBuilder m) =
-  Module . DList.toList <$> execStateT m mempty
+  Module . DList.toList . definitions <$> execStateT m beginState
+  where
+    beginState = ModuleBuilderState mempty mempty
 
 runModuleBuilder :: ModuleBuilder a -> Module
 runModuleBuilder = runIdentity . runModuleBuilderT
@@ -87,14 +99,24 @@ function name tys retTy fnBody = do
 
 emitDefinition :: MonadModuleBuilder m => Definition -> m ()
 emitDefinition def =
-  modify $ (flip DList.snoc def)
+  modify $ \s -> s { definitions = DList.snoc (definitions s) def }
+
+addType :: MonadModuleBuilder m => Name -> Type -> m ()
+addType name ty =
+  modify $ \s -> s { types = Map.insert name ty (types s) }
 
 global :: MonadModuleBuilder m => Name -> Type -> Constant -> m Operand
 global name ty constant = do
   emitDefinition $ GlobalDefinition $ GlobalVariable name ty constant
   pure $ ConstantOperand $ GlobalRef (ptr ty) name
 
--- TODO add extra variant for opaque typedef (if needed)
+typedef :: MonadModuleBuilder m => Name -> Type -> m Type
+typedef name ty = do
+  emitDefinition $ TypeDefinition name ty
+  addType name ty
+  pure $ NamedTypeReference name
+
+-- TODO add extra variant for opaque (no type provided) typedef (if needed)
 
 -- NOTE: Only used internally, this creates an unassigned operand
 mkOperand :: Monad m => Type -> IRBuilderT m Operand

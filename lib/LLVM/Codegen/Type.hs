@@ -8,6 +8,8 @@ module LLVM.Codegen.Type
   , ptr
   ) where
 
+-- TODO: split into separate name module
+import LLVM.NameSupply (Name)
 import LLVM.Pretty
 import Data.Word
 
@@ -15,6 +17,7 @@ data Type
   = IntType Word32
   | FunctionType Type [Type]
   | PointerType Type
+  | NamedTypeReference Name
   deriving Show
 
 i1, i8, i16, i32, i64 :: Type
@@ -35,3 +38,5 @@ instance Pretty Type where
       "i" <> pretty bits
     FunctionType retTy argTys ->
       pretty retTy <+> tupled (map pretty argTys)
+    NamedTypeReference name ->
+      "%" <> pretty name
