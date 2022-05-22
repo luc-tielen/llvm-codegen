@@ -34,7 +34,7 @@ A Haskell library for generating LLVM code. Inspired by the `llvm-hs`,
   - [x] retVoid
   - [ ] call
   - [x] ret
-  - [ ] switch
+  - [x] switch
   - [x] select
   - [x] condBr
   - ... (add as needed)

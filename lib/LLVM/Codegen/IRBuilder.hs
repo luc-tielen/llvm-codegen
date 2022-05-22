@@ -27,7 +27,7 @@ module LLVM.Codegen.IRBuilder
   , retVoid
   , br
   , condBr
-  -- , switch  TODO
+  , switch
   , select
   ) where
 
@@ -239,8 +239,9 @@ condBr :: Monad m => Operand -> Name -> Name -> IRBuilderT m ()
 condBr cond trueLabel falseLabel =
   emitTerminator (Terminator (CondBr cond trueLabel falseLabel))
 
--- switch :: Monad m => _ -> IRBuilderT m ()
--- switch = _
+switch :: Monad m => Operand -> Name -> [(Operand, Name)] -> IRBuilderT m ()
+switch value defaultDest dests =
+  emitTerminator $ Terminator $ Switch value defaultDest dests
 
 select :: Monad m => Operand -> Operand -> Operand -> IRBuilderT m Operand
 select c t f =

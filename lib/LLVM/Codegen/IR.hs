@@ -18,7 +18,6 @@ type NSW = Bool
 type Exact = Bool
 type Inbounds = Bool
 type Volatile = Bool
-type FastMath = Bool
 
 type Alignment = Word32
 
@@ -55,7 +54,7 @@ data IR
   | Ret (Maybe Operand)
   | Br Name
   | CondBr Operand Name Name
-  | Switch Type Operand Name [(Type, Operand, Name)]
+  | Switch Operand Name [(Operand, Name)]
   | Select Operand Operand Operand
   deriving Show
 
@@ -117,12 +116,12 @@ instance Pretty IR where
       "br label" <+> pretty blockName
     CondBr cond trueLabel falseLabel ->
       "br i1" <+> pretty cond <> ", label" <+> pretty trueLabel <+> ", label" <+> pretty falseLabel
-    Switch ty val defaultLabel cases ->
-      "switch" <+> pretty ty <+> pretty val <> "," <+> pretty defaultLabel <+>
+    Switch val defaultLabel cases ->
+      "switch" <+> pretty (typeOf val) <+> pretty val <> "," <+> pretty defaultLabel <+>
         list (map prettyCase cases)
       where
-        prettyCase (caseTy, caseVal, label) =
-          pretty caseTy <+> pretty caseVal <> ", label" <+> pretty label
+        prettyCase (caseVal, label) =
+          pretty (typeOf caseVal) <+> pretty caseVal <> ", label" <+> pretty label
     Select c t f ->
       "select" <+> pretty (typeOf c) <+> pretty c <> "," <+>
         pretty (typeOf t) <+> pretty t <> "," <+>
