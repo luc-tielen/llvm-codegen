@@ -6,6 +6,7 @@ module LLVM.Codegen.IR
   , TailCallAttribute(..)
   , SynchronizationScope(..)
   , MemoryOrdering(..)
+  , Alignment
   ) where
 
 import Prelude hiding (EQ)
@@ -78,6 +79,7 @@ data IR
   | PtrToInt Operand Type
   | Alloca Type (Maybe Operand) Int
   | GetElementPtr Inbounds Operand [Operand]
+  | Load Volatile Operand (Maybe Atomicity) Alignment
   | Store Volatile Operand Operand (Maybe Atomicity) Alignment
   | Phi (NonEmpty (Operand, Name))
   | Call (Maybe TailCallAttribute) CallingConvention Operand [Operand]  -- TODO support param attributes
@@ -128,6 +130,19 @@ instance Pretty IR where
           error "Operand given to `getelementptr` that is not a pointer!"
       where
         prettyIndex i = pretty (typeOf i) <+> pretty i
+    Load volatile ptr atomicity alignment ->
+      let ptrTy = typeOf ptr
+          resultTy = case ptrTy of
+            PointerType ty -> ty
+            _ -> error "Malformed AST, expected pointer type."
+          alignDoc = if alignment == 0 then mempty else ", align" <+> pretty alignment
+       in case atomicity of
+            Nothing ->
+              "load" <+> optional volatile "volatile" <> pretty resultTy <> "," <+> pretty ptrTy <+>
+                pretty ptr <> alignDoc
+            Just (syncScope, memoryOrdering) ->
+              "load atomic" <+> optional volatile "volatile" <> pretty resultTy <> "," <+> pretty ptrTy <+>
+                pretty ptr <+> pretty syncScope <+> pretty memoryOrdering <> alignDoc
     Store volatile addr value atomicity alignment ->
       let ty = typeOf value
           ptrTy = PointerType ty

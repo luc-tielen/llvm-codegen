@@ -44,7 +44,6 @@ import qualified Data.DList as DList
 import Data.DList (DList)
 import Data.Monoid
 import Data.Maybe
-import Data.Word
 import LLVM.NameSupply
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
@@ -201,21 +200,17 @@ gep operand indices = do
     Right ty ->
       emitInstr ty $ GetElementPtr False operand indices
 
-load :: Monad m => Operand -> Word32 -> IRBuilderT m Operand
+load :: Monad m => Operand -> Alignment -> IRBuilderT m Operand
 load addr align =
-  undefined -- TODO
+  case typeOf addr of
+    PointerType ty ->
+      emitInstr ty $ Load False addr Nothing align
+    _ ->
+      error "Malformed AST: Expected a pointer type"
 
-store :: Monad m => Operand -> Word32 -> Operand -> IRBuilderT m ()
+store :: Monad m => Operand -> Alignment -> Operand -> IRBuilderT m ()
 store addr align value =
   emitInstrVoid $ Store False addr value Nothing align
-
-phi :: Monad m => [(Operand, Name)] -> IRBuilderT m Operand
-phi cases
-  | null cases = error "phi instruction should always have > 0 cases!"
-  | otherwise =
-    let neCases = NE.fromList cases
-        ty = typeOf $ fst $ NE.head neCases
-     in emitInstr ty $ Phi neCases
 
 computeGepType :: HasCallStack => Type -> [Operand] -> Either String Type
 computeGepType ty [] = Right $ PointerType ty
@@ -238,6 +233,14 @@ indexTypeByOperands (NamedTypeReference n) is = do
     Nothing -> return $ Left $ "Couldn’t resolve typedef for: " ++ show n
     Just ty -> indexTypeByOperands ty is
     -}
+
+phi :: Monad m => [(Operand, Name)] -> IRBuilderT m Operand
+phi cases
+  | null cases = error "phi instruction should always have > 0 cases!"
+  | otherwise =
+    let neCases = NE.fromList cases
+        ty = typeOf $ fst $ NE.head neCases
+     in emitInstr ty $ Phi neCases
 
 call :: Monad m => Operand -> [Operand] -> IRBuilderT m Operand
 call fn args = case typeOf fn of
