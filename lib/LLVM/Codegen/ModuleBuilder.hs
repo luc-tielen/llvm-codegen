@@ -3,6 +3,7 @@ module LLVM.Codegen.ModuleBuilder
   , ModuleBuilder
   , runModuleBuilderT
   , runModuleBuilder
+  , MonadModuleBuilder
   , Module(..)
   , Definition(..)
   , function
@@ -52,6 +53,8 @@ newtype ModuleBuilderT m a
 
 type ModuleBuilder = ModuleBuilderT Identity
 
+type MonadModuleBuilder m = (MonadState ModuleBuilderState m, MonadFix m)
+
 runModuleBuilderT :: Monad m => ModuleBuilderT m a -> m Module
 runModuleBuilderT (ModuleBuilder m) =
   Module <$> execStateT m []
@@ -60,7 +63,7 @@ runModuleBuilder :: ModuleBuilder a -> Module
 runModuleBuilder = runIdentity . runModuleBuilderT
 
 
-function :: Monad m => Name -> [Type] -> Type -> ([Operand] -> IRBuilderT (ModuleBuilderT m) a) -> ModuleBuilderT m Operand
+function :: MonadModuleBuilder m => Name -> [Type] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
 function name tys retTy fnBody = do
   instrs <- runIRBuilderT $ do
     operands <- traverse mkOperand tys

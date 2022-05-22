@@ -33,6 +33,7 @@ default-extensions:
   - FlexibleContexts
   - FlexibleInstances
   - ScopedTypeVariables
+  - ConstraintKinds
 
 ghc-options:
   - -Wall
