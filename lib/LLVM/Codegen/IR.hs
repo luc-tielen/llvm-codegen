@@ -1,10 +1,12 @@
 module LLVM.Codegen.IR
   ( IR(..)
   , Terminator(..)
+  , ComparisonType(..)
   , SynchronizationScope(..)
   , MemoryOrdering(..)
   ) where
 
+import Prelude hiding (EQ)
 import qualified Data.List as L
 import LLVM.NameSupply  -- TODO: separate import for name
 import LLVM.Codegen.Operand
@@ -38,6 +40,19 @@ data MemoryOrdering
 
 type Atomicity = (SynchronizationScope, MemoryOrdering)
 
+data ComparisonType
+  = EQ
+  | NE
+  | UGT
+  | UGE
+  | ULT
+  | ULE
+  | SGT
+  | SGE
+  | SLT
+  | SLE
+  deriving (Eq, Show)
+
 data IR
   = Add NUW NSW Operand Operand
   | Mul NUW NSW Operand Operand
@@ -47,6 +62,7 @@ data IR
   | Trunc Operand Type
   | Zext Operand Type
   | Bitcast Operand Type
+  | ICmp ComparisonType Operand Operand
   | PtrToInt Operand Type
   | Alloca Type (Maybe Operand) Int
   | GetElementPtr Inbounds Operand [Operand]
@@ -83,6 +99,8 @@ instance Pretty IR where
       prettyConvertOp "zext" val to
     Bitcast val to ->
       prettyConvertOp "bitcast" val to
+    ICmp cmp a b ->
+      "icmp" <+> pretty cmp <+> pretty (typeOf a) <+> pretty a <> "," <+> pretty b
     PtrToInt val to ->
       prettyConvertOp "ptrtoint" val to
     Alloca ty numElems alignment ->
@@ -133,6 +151,19 @@ instance Pretty IR where
       "select" <+> pretty (typeOf c) <+> pretty c <> "," <+>
         pretty (typeOf t) <+> pretty t <> "," <+>
         pretty (typeOf f) <+> pretty f
+
+instance Pretty ComparisonType where
+  pretty = \case
+    EQ  -> "eq"
+    NE -> "ne"
+    UGT -> "ugt"
+    UGE -> "uge"
+    ULT -> "ult"
+    ULE -> "ule"
+    SGT -> "sgt"
+    SGE -> "sge"
+    SLT -> "slt"
+    SLE -> "sle"
 
 instance Pretty SynchronizationScope where
   pretty = \case

@@ -28,7 +28,7 @@ A Haskell library for generating LLVM code. Inspired by the `llvm-hs`,
   - [x] zext
   - [x] ptrtoint
   - [x] bitcast
-  - [ ] icmp
+  - [x] icmp
   - [x] br
   - [x] phi
   - [x] retVoid
@@ -41,3 +41,4 @@ A Haskell library for generating LLVM code. Inspired by the `llvm-hs`,
 - [ ] Add combinators for commonly used control flow constructs
 - [x] Add pretty printer for generating LLVM IR
 - [ ] Look into approach for supporting the C API
+- [ ] Support API with more compile time checks?

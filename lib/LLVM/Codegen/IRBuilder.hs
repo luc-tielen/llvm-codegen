@@ -19,6 +19,7 @@ module LLVM.Codegen.IRBuilder
   , zext
   , ptrtoint
   , bitcast
+  , icmp
   , alloca
   , gep
   , load
@@ -182,6 +183,10 @@ ptrtoint val ty =
 bitcast :: Monad m => Operand -> Type -> IRBuilderT m Operand
 bitcast val ty =
   emitInstr (typeOf val) $ Bitcast val ty
+
+icmp :: Monad m => ComparisonType -> Operand -> Operand -> IRBuilderT m Operand
+icmp cmp a b =
+  emitInstr (typeOf a) $ ICmp cmp a b
 
 alloca :: Monad m => Type -> (Maybe Operand) -> Int -> IRBuilderT m Operand
 alloca ty numElems alignment =
