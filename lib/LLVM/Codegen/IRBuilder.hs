@@ -33,6 +33,13 @@ module LLVM.Codegen.IRBuilder
   , condBr
   , switch
   , select
+
+  , bit
+  , int8
+  , int16
+  , int32
+  , int64
+  , intN
   ) where
 
 import Prelude hiding (and)
@@ -45,6 +52,7 @@ import qualified Data.DList as DList
 import Data.DList (DList)
 import Data.Monoid
 import Data.Maybe
+import Data.Word
 import LLVM.NameSupply
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
@@ -289,3 +297,26 @@ instance Pretty BasicBlock where
         let instrDoc = pretty instr
          in maybe instrDoc (\op -> pretty op <+> "=" <+> instrDoc) operand
 
+bit :: Bool -> Operand
+bit b =
+  intN 1 $ if b then 1 else 0
+
+int8 :: Int -> Operand
+int8 =
+  intN 8 . toInteger
+
+int16 :: Int -> Operand
+int16 =
+  intN 16 . toInteger
+
+int32 :: Int -> Operand
+int32 =
+  intN 32 . toInteger
+
+int64 :: Int -> Operand
+int64 =
+  intN 64 . toInteger
+
+intN :: Word32 -> Integer -> Operand
+intN bits value =
+  ConstantOperand $ Int bits value

@@ -3,9 +3,10 @@ module LLVM.Codegen.Type
   ) where
 
 import LLVM.Pretty
+import Data.Word
 
 data Type
-  = IntType Int
+  = IntType Word32
   | FunctionType Type [Type]
   | PointerType Type
   deriving Show

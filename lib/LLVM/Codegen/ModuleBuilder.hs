@@ -69,7 +69,7 @@ function name tys retTy fnBody = do
     operands <- traverse mkOperand tys
     fnBody operands
   modify $ (Function name retTy tys instrs:)
-  pure $ GlobalRef (PointerType (FunctionType retTy tys)) name
+  pure $ ConstantOperand $ GlobalRef (PointerType (FunctionType retTy tys)) name
 
 -- NOTE: Only used internally, this creates an unassigned operand
 mkOperand :: Monad m => Type -> IRBuilderT m Operand
