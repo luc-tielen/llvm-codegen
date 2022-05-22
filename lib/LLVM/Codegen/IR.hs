@@ -130,8 +130,8 @@ instance Pretty IR where
           error "Operand given to `getelementptr` that is not a pointer!"
       where
         prettyIndex i = pretty (typeOf i) <+> pretty i
-    Load volatile ptr atomicity alignment ->
-      let ptrTy = typeOf ptr
+    Load volatile addr atomicity alignment ->
+      let ptrTy = typeOf addr
           resultTy = case ptrTy of
             PointerType ty -> ty
             _ -> error "Malformed AST, expected pointer type."
@@ -139,10 +139,10 @@ instance Pretty IR where
        in case atomicity of
             Nothing ->
               "load" <+> optional volatile "volatile" <> pretty resultTy <> "," <+> pretty ptrTy <+>
-                pretty ptr <> alignDoc
+                pretty addr <> alignDoc
             Just (syncScope, memoryOrdering) ->
               "load atomic" <+> optional volatile "volatile" <> pretty resultTy <> "," <+> pretty ptrTy <+>
-                pretty ptr <+> pretty syncScope <+> pretty memoryOrdering <> alignDoc
+                pretty addr <+> pretty syncScope <+> pretty memoryOrdering <> alignDoc
     Store volatile addr value atomicity alignment ->
       let ty = typeOf value
           ptrTy = PointerType ty
