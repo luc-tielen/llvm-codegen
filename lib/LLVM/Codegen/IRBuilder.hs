@@ -23,6 +23,7 @@ module LLVM.Codegen.IRBuilder
   , gep
   , load
   , store
+  , phi
   , ret
   , retVoid
   , br
@@ -36,6 +37,7 @@ import GHC.Stack
 import Control.Monad.State
 import Control.Monad.Reader
 import Data.Functor.Identity
+import qualified Data.List.NonEmpty as NE
 import qualified Data.DList as DList
 import Data.DList (DList)
 import Data.Monoid
@@ -200,6 +202,14 @@ load addr align =
 store :: Monad m => Operand -> Word32 -> Operand -> IRBuilderT m ()
 store addr align value =
   emitInstrVoid $ Store False addr value Nothing align
+
+phi :: Monad m => [(Operand, Name)] -> IRBuilderT m Operand
+phi cases
+  | null cases = error "phi instruction should always have > 0 cases!"
+  | otherwise =
+    let neCases = NE.fromList cases
+        ty = typeOf $ fst $ NE.head neCases
+     in emitInstr ty $ Phi neCases
 
 computeGepType :: HasCallStack => Type -> [Operand] -> Either String Type
 computeGepType ty [] = Right $ PointerType ty

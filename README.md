@@ -30,7 +30,7 @@ A Haskell library for generating LLVM code. Inspired by the `llvm-hs`,
   - [x] bitcast
   - [ ] icmp
   - [x] br
-  - [ ] phi
+  - [x] phi
   - [x] retVoid
   - [ ] call
   - [x] ret

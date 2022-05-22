@@ -11,6 +11,7 @@ import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Pretty
 import Data.Word
+import Data.List.NonEmpty (NonEmpty(..), toList)
 
 -- TODO: create Flag datatype
 type NUW = Bool
@@ -50,6 +51,7 @@ data IR
   | Alloca Type (Maybe Operand) Int
   | GetElementPtr Inbounds Operand [Operand]
   | Store Volatile Operand Operand (Maybe Atomicity) Alignment
+  | Phi (NonEmpty (Operand, Name))
   -- Terminators
   | Ret (Maybe Operand)
   | Br Name
@@ -106,6 +108,11 @@ instance Pretty IR where
             Just (syncScope, memoryOrdering) ->
               "store atomic" <+> optional volatile "volatile" <> pretty ty <+> pretty value <> "," <+>
                 pretty ptrTy <+> pretty addr <+> pretty syncScope <+> pretty memoryOrdering <> alignDoc
+    Phi cases@((val, _) :| _) ->
+      "phi" <+> pretty (typeOf val) <+> (mconcat $ L.intersperse ", " $ toList $ fmap prettyPhiCase cases)
+      where
+        prettyPhiCase (value, name) =
+          brackets $ pretty value <> "," <+> pretty name
     Ret term ->
       case term of
         Nothing ->
