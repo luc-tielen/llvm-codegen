@@ -125,7 +125,7 @@ instance Pretty IR where
       case typeOf pointer of
         ty@(PointerType innerTy) ->
           "getelementptr" <+> optional inbounds "inbounds" <> pretty innerTy <> "," <> pretty ty <+>
-            pretty pointer <> "," <+> (mconcat $ L.intersperse ", " $ map prettyIndex indices)
+            pretty pointer <> "," <+> (commas $ map prettyIndex indices)
         _ ->
           error "Operand given to `getelementptr` that is not a pointer!"
       where
@@ -155,7 +155,7 @@ instance Pretty IR where
               "store atomic" <+> optional volatile "volatile" <> pretty ty <+> pretty value <> "," <+>
                 pretty ptrTy <+> pretty addr <+> pretty syncScope <+> pretty memoryOrdering <> alignDoc
     Phi cases@((val, _) :| _) ->
-      "phi" <+> pretty (typeOf val) <+> (mconcat $ L.intersperse ", " $ toList $ fmap prettyPhiCase cases)
+      "phi" <+> pretty (typeOf val) <+> (commas $ toList $ fmap prettyPhiCase cases)
       where
         prettyPhiCase (value, name) =
           brackets $ pretty value <> "," <+> pretty name
@@ -166,7 +166,7 @@ instance Pretty IR where
           FunctionType retTy _ -> retTy
           _ -> error "Malformed AST, expected function type."
         tcDoc = maybeDoc tcAttr (\tc -> pretty tc <> " ")
-        prettyArgs = parens $ mconcat $ L.intersperse ", " $ map prettyArg args
+        prettyArgs = parens $ commas $ map prettyArg args
         prettyArg arg =
           pretty (typeOf arg) <+> pretty arg
     Ret term ->

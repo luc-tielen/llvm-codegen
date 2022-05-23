@@ -6,6 +6,7 @@ module LLVM.Codegen.Type
   , i32
   , i64
   , ptr
+  , void
   ) where
 
 -- TODO: split into separate name module
@@ -13,10 +14,16 @@ import LLVM.NameSupply (Name)
 import LLVM.Pretty
 import Data.Word
 
+-- TODO: flag
+type Packed = Bool
+
 data Type
   = IntType Word32
   | FunctionType Type [Type]
   | PointerType Type
+  | VoidType
+  | StructureType Packed [Type]
+  | ArrayType Word64 Type
   | NamedTypeReference Name
   deriving Show
 
@@ -30,6 +37,9 @@ i64 = IntType 64
 ptr :: Type -> Type
 ptr = PointerType
 
+void :: Type
+void = VoidType
+
 instance Pretty Type where
   pretty = \case
     PointerType ty ->
@@ -40,3 +50,12 @@ instance Pretty Type where
       pretty retTy <+> tupled (map pretty argTys)
     NamedTypeReference name ->
       "%" <> pretty name
+    VoidType ->
+      "void"
+    StructureType packed elemTys
+      | packed ->
+        "<{" <> (commas $ map pretty elemTys ) <> "}>"
+      | otherwise ->
+        "{" <> (commas $ map pretty elemTys ) <> "}"
+    ArrayType count ty ->
+      brackets $ pretty count <+> "x" <+> pretty ty
