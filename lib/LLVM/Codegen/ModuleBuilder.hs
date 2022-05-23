@@ -72,7 +72,7 @@ data ModuleBuilderState
 
 newtype ModuleBuilderT m a
   = ModuleBuilder (StateT ModuleBuilderState m a)
-  deriving (Functor, Applicative, Monad, MonadState ModuleBuilderState, MonadFix)
+  deriving (Functor, Applicative, Monad, MonadState ModuleBuilderState, MonadFix, MonadIO)
   via StateT ModuleBuilderState m
 
 type ModuleBuilder = ModuleBuilderT Identity

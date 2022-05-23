@@ -1,4 +1,4 @@
-cabal-version: 1.12
+cabal-version: 1.24
 
 -- This file has been generated from package.yaml by hpack version 0.34.7.
 --
@@ -13,12 +13,20 @@ maintainer:     luc.tielen@gmail.com
 copyright:      Luc Tielen, 2022
 license:        BSD3
 license-file:   LICENSE
-build-type:     Simple
+build-type:     Custom
 extra-source-files:
     README.md
 
+custom-setup
+  setup-depends:
+      Cabal
+    , base
+    , containers
+
 library
   exposed-modules:
+      LLVM.C.API
+      LLVM.C.Bindings
       LLVM.Codegen
       LLVM.Codegen.IR
       LLVM.Codegen.IRBuilder
@@ -60,6 +68,7 @@ test-suite llvm-codegen-test
   type: exitcode-stdio-1.0
   main-is: test.hs
   other-modules:
+      Test.LLVM.C.APISpec
       Paths_llvm_codegen
   hs-source-dirs:
       tests

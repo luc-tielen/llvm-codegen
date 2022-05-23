@@ -31,7 +31,7 @@ data NameSupplyState
 
 newtype NameSupplyT m a
   = NameSupplyT (RWST (Maybe Name) () NameSupplyState m a)
-  deriving (Functor, Applicative, Monad, MonadReader (Maybe Name), MonadState NameSupplyState, MonadFix)
+  deriving (Functor, Applicative, Monad, MonadReader (Maybe Name), MonadState NameSupplyState, MonadFix, MonadIO)
   via RWST (Maybe Name) () NameSupplyState m
 
 runNameSupplyT :: Monad m => NameSupplyT m a -> m a

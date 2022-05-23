@@ -82,7 +82,7 @@ data IRBuilderState
 
 newtype IRBuilderT m a
   = IRBuilderT (StateT IRBuilderState (NameSupplyT m) a)
-  deriving ( Functor, Applicative, Monad, MonadFix
+  deriving ( Functor, Applicative, Monad, MonadFix, MonadIO
            , MonadReader (Maybe Name), MonadState IRBuilderState
            , MonadNameSupply
            )
