@@ -37,6 +37,7 @@
           imports = [];
           packages = with pkgs;
             with haskellPackages; [
+              pkgs.llvm_14
               pkgs.ghcid
               (ghcWithPackages (p:
                 with p; [
