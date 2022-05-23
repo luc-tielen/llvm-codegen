@@ -23,7 +23,7 @@ data Type
   | PointerType Type
   | VoidType
   | StructureType Packed [Type]
-  | ArrayType Word64 Type
+  | ArrayType Word32 Type
   | NamedTypeReference Name
   deriving Show
 

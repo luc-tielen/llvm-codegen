@@ -1,3 +1,5 @@
+-- NOTE: Copied from the llvm-hs project. Only modification is the LLVM version.
+
 {-# LANGUAGE CPP, FlexibleInstances #-}
 import Control.Exception (SomeException, try)
 import Control.Monad

@@ -73,7 +73,9 @@ mkModule ctx name =
   withCString (T.unpack name) $ \name' -> do
     withForeignPtr ctx $ \c -> mask_ $ do
       llvmModule <- llvmCreateModuleWithName name' c
-      newForeignPtr llvmDisposeModule llvmModule
+      -- TODO next line causes segfault? is this because some other field needs to get set first? or auto-cleaned up in context?
+      -- newForeignPtr llvmDisposeModule llvmModule
+      newForeignPtr_  llvmModule
 
 getTargetData :: ForeignPtr Module -> IO (Ptr TargetData)
 getTargetData llvmModule =
