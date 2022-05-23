@@ -10,7 +10,6 @@ module LLVM.Codegen.IR
   ) where
 
 import Prelude hiding (EQ)
-import qualified Data.List as L
 import LLVM.NameSupply  -- TODO: separate import for name
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
