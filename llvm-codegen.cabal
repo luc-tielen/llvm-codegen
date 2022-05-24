@@ -69,6 +69,7 @@ test-suite llvm-codegen-test
   main-is: test.hs
   other-modules:
       Test.LLVM.C.APISpec
+      Test.LLVM.Codegen.IRBuilderSpec
       Paths_llvm_codegen
   hs-source-dirs:
       tests
@@ -96,6 +97,7 @@ test-suite llvm-codegen-test
     , hspec-hedgehog ==0.*
     , llvm-codegen
     , mtl ==2.*
+    , neat-interpolation ==0.*
     , prettyprinter ==1.7.1
     , text ==1.*
   default-language: Haskell2010

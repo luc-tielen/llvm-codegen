@@ -15,11 +15,15 @@ import qualified Data.Map as M
 import Data.Text (Text)
 import Data.Map (Map)
 import Data.Maybe
+import Data.String
 import LLVM.Pretty
 
 
 newtype Name = Name { unName :: Text }
   deriving (Eq, Ord, Show)
+
+instance IsString Name where
+  fromString = Name . fromString
 
 type Counter = Int
 
