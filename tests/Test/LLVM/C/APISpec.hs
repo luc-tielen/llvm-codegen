@@ -6,11 +6,10 @@ import Test.Hspec
 import Foreign hiding (void)
 import qualified LLVM.C.API as C
 import LLVM.Codegen.Type
+import LLVM.NameSupply  -- TODO only import Name
 
 -- NOTE: if it can't find libffi, you're linking against wrong libLLVM!
 -- Be sure to update Setup.hs LLVM version as well to be in sync!
-
--- TODO: do more than checking against nullptr
 
 mkType :: ForeignPtr C.Context -> Type -> IO (Ptr C.Type)
 mkType ctx = \case
@@ -31,7 +30,10 @@ mkType ctx = \case
     argTys' <- traverse (mkType ctx) argTys
     C.mkFunctionType retTy' argTys'
   NamedTypeReference name ->
-    undefined  -- TODO
+    C.getTypeByName ctx name
+
+
+-- TODO: do more than checking against nullptr in first tests
 
 spec :: Spec
 spec = describe "LLVM C API" $ parallel $ do
@@ -70,10 +72,7 @@ spec = describe "LLVM C API" $ parallel $ do
       assert i32 4
       assert i64 8
 
-  -- TODO: causes SIGILL
-  xit "can compute the size of a void type" $ do
-    assertTypeSizes $ \assert -> do
-      assert void 0  -- or 1?
+  -- NOTE: not allowed for "void" => has no size, causes SIGILL (due to missing return in a function in libLLVM / assert triggered)
 
   it "can compute the size of a pointer type" $ do
     assertTypeSizes $ \assert -> do
@@ -99,9 +98,13 @@ spec = describe "LLVM C API" $ parallel $ do
       assert (ArrayType 10 i32) 40
       assert (ArrayType 5 (StructureType False [i32, i64])) (5 * 12)
 
-  -- TODO should return size of a ptr?
-  xit "can compute the size of a function type" $ do
-    assertTypeSizes $ \assert -> do
-      assert (FunctionType i8 [i8, i8]) 8
+  -- NOTE: not allowed for function type => has no size, triggers undefined behavior.
 
-  -- TODO namedtyperef?
+  it "returns null for an unknown named type reference" $ do
+    let ty = NamedTypeReference $ Name "unknown"
+    ctx <- C.mkContext
+    ty' <- mkType ctx ty
+    ty' `shouldBe` nullPtr
+
+  -- TODO test for known named type ref,
+  -- but need to implement LLVMStructCreateNamed + LLVMStructSetBody first to add to module

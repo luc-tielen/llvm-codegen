@@ -12,7 +12,6 @@ A Haskell library for generating LLVM code. Inspired by the `llvm-hs`,
 
 ## TODO
 
-- [ ] Look into approach for supporting the C API
 - [ ] Add combinators for commonly used control flow constructs
 - [ ] Add support for remaining instructions as needed
 - [ ] Support API with more compile time checks?

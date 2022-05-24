@@ -14,6 +14,7 @@ module LLVM.C.API
   , mkStructType
   , mkArrayType
   , mkFunctionType
+  , getTypeByName
   ) where
 
 import Data.Word
@@ -25,6 +26,7 @@ import Control.Exception
 import Data.Text (Text)
 import qualified Data.Text as T
 import LLVM.C.Bindings
+import LLVM.NameSupply  -- TODO only import Name
 
 
 mkVoidType :: ForeignPtr Context -> IO (Ptr Type)
@@ -52,6 +54,10 @@ mkStructType ctx tys packed =
           packed' = CBool (if packed then 1 else 0)
       llvmStructTypeInContext c tyArray count packed'
 
+mkArrayType :: Ptr Type -> Word32 -> IO (Ptr Type)
+mkArrayType elemTy count =
+  llvmArrayTypeInContext elemTy (CUInt count)
+
 mkFunctionType :: Ptr Type -> [Ptr Type] -> IO (Ptr Type)
 mkFunctionType retTy argTys =
   withArray argTys $ \argTyArray -> do
@@ -59,9 +65,11 @@ mkFunctionType retTy argTys =
         isVarArg = CBool 0
     llvmFunctionTypeInContext retTy argTyArray argCount isVarArg
 
-mkArrayType :: Ptr Type -> Word32 -> IO (Ptr Type)
-mkArrayType elemTy count =
-  llvmArrayTypeInContext elemTy (CUInt count)
+getTypeByName :: ForeignPtr Context -> Name -> IO (Ptr Type)
+getTypeByName ctx (Name name) =
+  withForeignPtr ctx $ \c ->
+    withCString (T.unpack name) $ \str ->
+      llvmGetTypeByNameInContext c str
 
 mkContext :: IO (ForeignPtr Context)
 mkContext = mask_ $ do
@@ -75,6 +83,7 @@ mkModule ctx name =
       llvmModule <- llvmCreateModuleWithName name' c
       -- TODO next line causes segfault? is this because some other field needs to get set first? or auto-cleaned up in context?
       -- newForeignPtr llvmDisposeModule llvmModule
+      -- TODO: no longer need foreignptr wrapper then?
       newForeignPtr_  llvmModule
 
 getTargetData :: ForeignPtr Module -> IO (Ptr TargetData)

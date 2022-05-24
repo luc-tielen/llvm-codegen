@@ -20,6 +20,7 @@ module LLVM.C.Bindings
   , llvmStructTypeInContext
   , llvmArrayTypeInContext
   , llvmFunctionTypeInContext
+  , llvmGetTypeByNameInContext
   ) where
 
 import Foreign.C
@@ -84,3 +85,5 @@ foreign import ccall unsafe "LLVMArrayType" llvmArrayTypeInContext
 foreign import ccall unsafe "LLVMFunctionType" llvmFunctionTypeInContext
   :: Ptr Type -> Ptr (Ptr Type) -> CUInt -> CBool -> IO (Ptr Type)
 
+foreign import ccall unsafe "LLVMGetTypeByName2" llvmGetTypeByNameInContext
+  :: Ptr Context -> CString -> IO (Ptr Type)
