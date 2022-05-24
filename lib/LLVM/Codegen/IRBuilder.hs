@@ -197,15 +197,15 @@ zext val ty =
 
 ptrtoint :: MonadIRBuilder m => Operand -> Type -> m Operand
 ptrtoint val ty =
-  emitInstr (typeOf val) $ PtrToInt val ty
+  emitInstr ty $ PtrToInt val ty
 
 bitcast :: MonadIRBuilder m => Operand -> Type -> m Operand
 bitcast val ty =
-  emitInstr (typeOf val) $ Bitcast val ty
+  emitInstr ty $ Bitcast val ty
 
 icmp :: MonadIRBuilder m => ComparisonType -> Operand -> Operand -> m Operand
 icmp cmp a b =
-  emitInstr (typeOf a) $ ICmp cmp a b
+  emitInstr i1 $ ICmp cmp a b
 
 alloca :: MonadIRBuilder m => Type -> (Maybe Operand) -> Int -> m Operand
 alloca ty numElems alignment =
@@ -253,7 +253,7 @@ indexTypeByOperands (NamedTypeReference n) is = do
     Just ty -> indexTypeByOperands ty is
     -}
 
-phi :: MonadIRBuilder m => [(Operand, Name)] -> m Operand
+phi :: (HasCallStack, MonadIRBuilder m) => [(Operand, Name)] -> m Operand
 phi cases
   | null cases = error "phi instruction should always have > 0 cases!"
   | otherwise =
@@ -261,11 +261,16 @@ phi cases
         ty = typeOf $ fst $ NE.head neCases
      in emitInstr ty $ Phi neCases
 
-call :: MonadIRBuilder m => Operand -> [Operand] -> m Operand
+call :: (HasCallStack, MonadIRBuilder m) => Operand -> [Operand] -> m Operand
 call fn args = case typeOf fn of
-  FunctionType retTy _ ->
-    emitInstr retTy $ Call Nothing C fn args
+  FunctionType retTy _->
+    emitCallInstr retTy
+  PointerType (FunctionType retTy _) ->
+    emitCallInstr retTy
   _ -> error "Malformed AST, expected function type in 'call' instruction"
+  where
+    emitCallInstr resultTy =
+      emitInstr resultTy $ Call Nothing C fn args
 
 ret :: MonadIRBuilder m => Operand -> m ()
 ret val =

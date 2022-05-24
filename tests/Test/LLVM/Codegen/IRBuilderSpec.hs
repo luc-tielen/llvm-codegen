@@ -4,7 +4,8 @@ module Test.LLVM.Codegen.IRBuilderSpec
   ( module Test.LLVM.Codegen.IRBuilderSpec
   ) where
 
-import Prelude hiding (and)
+import Prelude hiding (and, EQ)
+import Data.Foldable hiding (and)
 import Test.Hspec
 import NeatInterpolation
 import Data.Text (Text)
@@ -12,6 +13,7 @@ import Data.Text (Text)
 import LLVM.Codegen.ModuleBuilder
 import LLVM.Codegen.IRBuilder
 import LLVM.Codegen.Type
+import LLVM.Codegen.IR
 import LLVM.Codegen.Operand
 import LLVM.Pretty
 
@@ -24,7 +26,10 @@ checkIR llvmModule expectedOutput = do
 spec :: Spec
 spec = describe "constructing LLVM IR" $ do
   -- Module level
-  it "supports an empty module" pending
+
+  it "supports an empty module" $ do
+    let ir = pure ()
+    checkIR ir ""
 
   it "supports global constants" $ do
     let ir = global "my_constant" i32 (Int 32 42)
@@ -266,12 +271,57 @@ spec = describe "constructing LLVM IR" $ do
       }
       |]
 
-  it "supports 'ptrtoint' instruction" pending
+  it "supports 'ptrtoint' instruction" $ do
+    let ir = do
+          function "func" [ptr i32] i64 $ \[a] -> do
+            b <- ptrtoint a i64
+            ret b
+    checkIR ir [text|
+      define external ccc i64 @func(i32* %0) {
+      start:
+        %1 = ptrtoint i32* %0 to i64
+        ret i64 %1
+      }
+      |]
 
-  it "supports 'bitcast' instruction" pending
+  it "supports 'bitcast' instruction" $ do
+    let ir = do
+          function "func" [ptr i32] (ptr i64) $ \[a] -> do
+            b <- a `bitcast` ptr i64
+            ret b
+    checkIR ir [text|
+      define external ccc i64* @func(i32* %0) {
+      start:
+        %1 = bitcast i32* %0 to i64*
+        ret i64* %1
+      }
+      |]
 
-  -- TODO all comparisons
-  it "supports 'icmp' instruction" pending
+  it "supports 'icmp' instruction" $ do
+    let scenarios =
+          [ (EQ, "eq")
+          , (NE, "ne")
+          , (ULE, "ule")
+          , (UGT, "ugt")
+          , (UGE, "uge")
+          , (UGT, "ugt")
+          , (SLE, "sle")
+          , (SLT, "slt")
+          , (SGE, "sge")
+          , (SGT, "sgt")
+          ]
+    for_ scenarios $ \(cmp, cmpText) -> do
+      let ir = do
+            function "func" [i32, i32] i1 $ \[a, b] -> do
+              c <- icmp cmp a b
+              ret c
+      checkIR ir [text|
+        define external ccc i1 @func(i32 %0, i32 %1) {
+        start:
+          %2 = icmp $cmpText i32 %0, %1
+          ret i1 %2
+        }
+        |]
 
   it "supports 'alloca' instruction" pending
 
@@ -281,9 +331,49 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'store' instruction" pending
 
-  it "supports 'phi' instruction" pending
+  it "supports 'phi' instruction" $ do
+    let ir = do
+          function "func" [i32, i32] i32 $ \[a, b] -> mdo
+            c <- icmp EQ a b
+            condBr c block1 block2
 
-  it "supports 'call' instruction" pending
+            block1 <- block
+            br block3
+
+            block2 <- block
+            br block3
+
+            block3 <- block
+            d <- phi [(a, block1), (b, block2)]
+            ret d
+    checkIR ir [text|
+      define external ccc i32 @func(i32 %0, i32 %1) {
+      start:
+        %2 = icmp eq i32 %0, %1
+        br i1 %2, label %block_0, label %block_1
+      block_0:
+        br label %block_2
+      block_1:
+        br label %block_2
+      block_2:
+        %3 = phi i32 [%0, %block_0], [%1, %block_1]
+        ret i32 %3
+      }
+      |]
+
+  it "supports 'call' instruction" $ do
+    let ir = mdo
+          func <- function "func" [i32] (i32) $ \[a] -> do
+            ret =<< call func [a]
+
+          pure ()
+    checkIR ir [text|
+      define external ccc i32 @func(i32 %0) {
+      start:
+        %1 = call ccc i32 @func(i32 %0)
+        ret i32 %1
+      }
+      |]
 
   it "supports 'ret' instruction" $ do
     let ir = do
@@ -366,7 +456,29 @@ spec = describe "constructing LLVM IR" $ do
       }
       |]
 
-  it "supports 'switch' instruction" pending
+  it "supports 'switch' instruction" $ do
+    let ir = do
+          function "func" [i1] i1 $ \[a] -> mdo
+            switch a defaultBlock [(bit True, block1), (bit False, block2)]
+            block1 <- block
+            ret a
+            block2 <- block
+            ret a
+            defaultBlock <- block
+            ret a
+    checkIR ir [text|
+      define external ccc i1 @func(i1 %0) {
+      start:
+        switch i1 %0, block_2 [i1 1, label block_0, i1 0, label block_1]
+      block_0:
+        ret i1 %0
+      block_1:
+        ret i1 %0
+      block_2:
+        ret i1 %0
+      }
+      |]
+
 
   it "supports 'select' instruction" $ do
     let ir = do

@@ -157,11 +157,12 @@ instance Pretty IR where
       "phi" <+> pretty (typeOf val) <+> (commas $ toList $ fmap prettyPhiCase cases)
       where
         prettyPhiCase (value, name) =
-          brackets $ pretty value <> "," <+> pretty name
+          brackets $ pretty value <> "," <+> "%" <> pretty name
     Call tcAttr cc fn args ->
-      tcDoc <> "call" <+> pretty cc <+> pretty resultType <+> pretty fn <+> prettyArgs
+      tcDoc <> "call" <+> pretty cc <+> pretty resultType <+> pretty fn <> prettyArgs
       where
         resultType = case typeOf fn of
+          PointerType (FunctionType retTy _) -> retTy
           FunctionType retTy _ -> retTy
           _ -> error "Malformed AST, expected function type."
         tcDoc = maybeDoc tcAttr (\tc -> pretty tc <> " ")
