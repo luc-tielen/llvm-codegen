@@ -47,7 +47,7 @@ instance Pretty Definition where
    GlobalDefinition g ->
      pretty g
    TypeDefinition name ty ->
-     "%" <> pretty name <+> "=" <+> pretty ty
+     "%" <> pretty name <+> "=" <+> "type" <+> pretty ty
 
 instance Pretty Global where
   pretty = \case
@@ -61,7 +61,7 @@ instance Pretty Global where
       where
         fnName = "@" <> pretty name
         prettyArg :: Int -> Type -> Doc ann
-        prettyArg i argTy = pretty $ LocalRef argTy $ Name $ T.pack (show i)
+        prettyArg i argTy = pretty argTy <+> pretty (LocalRef argTy $ Name $ T.pack $ show i)
         prettyBody blocks = vsep $ map pretty blocks
 
 data ModuleBuilderState

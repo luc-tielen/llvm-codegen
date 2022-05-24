@@ -117,15 +117,18 @@ block :: MonadIRBuilder m => m Name
 block = do
   blockName <- ask >>= \case
     Nothing -> do
-      name <- fresh
-      pure $ Name $ "block_" <> unName name
+      fresh `named` "block"
     Just _sugg ->
       fresh
 
   modify $ \s ->
     let currBlock = currentBlock s
+        hasntStartedBlock = null (DList.toList (pbInstructions currBlock)) && isNothing (getFirst (pbTerminator currBlock))
         blocks = basicBlocks s
-     in s { basicBlocks = DList.snoc blocks (partialBlockToBasicBlock currBlock)
+     in s { basicBlocks =
+              if hasntStartedBlock
+                then blocks
+                else DList.snoc blocks (partialBlockToBasicBlock currBlock)
           , currentBlock = PartialBlock blockName mempty mempty
           }
   pure blockName
@@ -186,11 +189,11 @@ and lhs rhs =
 
 trunc :: MonadIRBuilder m => Operand -> Type -> m Operand
 trunc val ty =
-  emitInstr (typeOf val) $ Trunc val ty
+  emitInstr ty $ Trunc val ty
 
 zext :: MonadIRBuilder m => Operand -> Type -> m Operand
 zext val ty =
-  emitInstr (typeOf val) $ Zext val ty
+  emitInstr ty $ Zext val ty
 
 ptrtoint :: MonadIRBuilder m => Operand -> Type -> m Operand
 ptrtoint val ty =

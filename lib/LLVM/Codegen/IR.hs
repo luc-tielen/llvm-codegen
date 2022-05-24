@@ -175,9 +175,9 @@ instance Pretty IR where
         Just operand ->
           "ret " <> pretty (typeOf operand) <+> pretty operand
     Br blockName ->
-      "br label" <+> pretty blockName
+      "br label" <+> "%" <> pretty blockName
     CondBr cond trueLabel falseLabel ->
-      "br i1" <+> pretty cond <> ", label" <+> pretty trueLabel <+> ", label" <+> pretty falseLabel
+      "br i1" <+> pretty cond <> ", label" <+> "%" <> pretty trueLabel <> ", label" <+> "%" <> pretty falseLabel
     Switch val defaultLabel cases ->
       "switch" <+> pretty (typeOf val) <+> pretty val <> "," <+> pretty defaultLabel <+>
         list (map prettyCase cases)
@@ -234,7 +234,7 @@ prettyArithBinOp opName nuw nsw a b =
 
 prettyConvertOp :: Doc ann -> Operand -> Type -> Doc ann
 prettyConvertOp opName val to =
-  opName <+> pretty (typeOf val) <+> "to" <+> pretty to
+  opName <+> pretty (typeOf val) <+> pretty val <+> "to" <+> pretty to
 
 optional :: Bool -> Doc ann -> Doc ann
 optional b doc = case b of
