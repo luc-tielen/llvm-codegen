@@ -15,6 +15,7 @@ import qualified Control.Monad.RWS.Strict as StrictRWS
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.Except
+import Control.Monad.Morph
 import Data.Functor.Identity
 import qualified Data.DList as DList
 import Data.DList (DList)
@@ -46,7 +47,7 @@ data IRBuilderState
   }
 
 newtype IRBuilderT m a
-  = IRBuilderT (StateT IRBuilderState (NameSupplyT m) a)
+  = IRBuilderT { unIRBuilderT :: (StateT IRBuilderState (NameSupplyT m) a) }
   deriving ( Functor, Applicative, Monad, MonadFix, MonadIO
            , MonadReader (Maybe Name), MonadState IRBuilderState
            , MonadNameSupply
@@ -55,6 +56,9 @@ newtype IRBuilderT m a
 
 instance MonadTrans IRBuilderT where
   lift = IRBuilderT . lift . lift
+
+instance MFunctor IRBuilderT where
+  hoist nat = IRBuilderT . hoist (hoist nat) . unIRBuilderT
 
 type IRBuilder = IRBuilderT Identity
 

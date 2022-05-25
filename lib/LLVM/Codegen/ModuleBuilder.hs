@@ -22,6 +22,7 @@ import qualified Control.Monad.RWS.Strict as StrictRWS
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.Except
+import Control.Monad.Morph
 import Data.DList (DList)
 import Data.Map (Map)
 import qualified Data.DList as DList
@@ -82,11 +83,14 @@ data ModuleBuilderState
   }
 
 newtype ModuleBuilderT m a
-  = ModuleBuilderT (StateT ModuleBuilderState m a)
+  = ModuleBuilderT { unModuleBuilderT :: (StateT ModuleBuilderState m a) }
   deriving (Functor, Applicative, Monad, MonadState ModuleBuilderState, MonadFix, MonadIO)
   via StateT ModuleBuilderState m
 
 type ModuleBuilder = ModuleBuilderT Identity
+
+instance MFunctor ModuleBuilderT where
+  hoist nat = ModuleBuilderT . hoist nat . unModuleBuilderT
 
 class Monad m => MonadModuleBuilder m where
   liftModuleBuilderState :: State ModuleBuilderState a -> m a

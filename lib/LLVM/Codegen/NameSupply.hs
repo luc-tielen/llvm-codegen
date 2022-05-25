@@ -17,6 +17,7 @@ import qualified Control.Monad.State.Strict as StrictState
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.Except
+import Control.Monad.Morph
 import qualified Data.Text as T
 import qualified Data.Map as M
 import Data.Map (Map)
@@ -33,12 +34,15 @@ data NameSupplyState
   }
 
 newtype NameSupplyT m a
-  = NameSupplyT (RWST (Maybe Name) () NameSupplyState m a)
+  = NameSupplyT { unNameSupplyT :: RWST (Maybe Name) () NameSupplyState m a }
   deriving (Functor, Applicative, Monad, MonadReader (Maybe Name), StrictState.MonadState NameSupplyState, MonadFix, MonadIO)
   via RWST (Maybe Name) () NameSupplyState m
 
 instance MonadTrans NameSupplyT where
   lift = NameSupplyT . lift
+
+instance MFunctor NameSupplyT where
+  hoist nat = NameSupplyT . hoist nat . unNameSupplyT
 
 runNameSupplyT :: Monad m => NameSupplyT m a -> m a
 runNameSupplyT (NameSupplyT m) =
