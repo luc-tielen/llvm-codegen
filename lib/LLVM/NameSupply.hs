@@ -38,6 +38,9 @@ newtype NameSupplyT m a
   deriving (Functor, Applicative, Monad, MonadReader (Maybe Name), MonadState NameSupplyState, MonadFix, MonadIO)
   via RWST (Maybe Name) () NameSupplyState m
 
+instance MonadTrans NameSupplyT where
+  lift = NameSupplyT . lift
+
 runNameSupplyT :: Monad m => NameSupplyT m a -> m a
 runNameSupplyT (NameSupplyT m) =
   fst <$> evalRWST m Nothing (NameSupplyState 0 mempty)
@@ -45,9 +48,12 @@ runNameSupplyT (NameSupplyT m) =
 class Monad m => MonadNameSupply m where
   fresh :: m Name
   named :: m a -> Name -> m a
+  getSuggestion :: m (Maybe Name)
 
 instance Monad m => MonadNameSupply (NameSupplyT m) where
-  fresh = ask >>= \case
+  getSuggestion = ask
+
+  fresh = getSuggestion >>= \case
     Nothing -> do
       count <- gets counter
       modify $ \s -> s { counter = count + 1 }
@@ -63,9 +69,11 @@ instance Monad m => MonadNameSupply (NameSupplyT m) where
     local (const $ Just name) m
 
 instance MonadNameSupply m => MonadNameSupply (StateT s m) where
+  getSuggestion = lift getSuggestion
   fresh = lift fresh
   named = flip $ (mapStateT . flip named)
 
+-- TODO other instances, default signatures
 
 instance Pretty Name where
   pretty (Name name) =

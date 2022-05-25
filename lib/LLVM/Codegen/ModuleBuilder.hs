@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+
 module LLVM.Codegen.ModuleBuilder
   ( ModuleBuilderT
   , ModuleBuilder
@@ -9,6 +11,7 @@ module LLVM.Codegen.ModuleBuilder
   , function
   , global
   , typedef
+  , lookupType
   ) where
 
 import Control.Monad.State
@@ -18,7 +21,7 @@ import qualified Data.DList as DList
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import Data.Functor.Identity
-import LLVM.Codegen.IRBuilder
+import LLVM.Codegen.IRBuilder.Monad
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.NameSupply
@@ -71,23 +74,36 @@ data ModuleBuilderState
   }
 
 newtype ModuleBuilderT m a
-  = ModuleBuilder (StateT ModuleBuilderState m a)
+  = ModuleBuilderT (StateT ModuleBuilderState m a)
   deriving (Functor, Applicative, Monad, MonadState ModuleBuilderState, MonadFix, MonadIO)
   via StateT ModuleBuilderState m
 
 type ModuleBuilder = ModuleBuilderT Identity
 
-type MonadModuleBuilder m = (MonadState ModuleBuilderState m, MonadFix m)
+class Monad m => MonadModuleBuilder m where
+  liftModuleBuilderState :: State ModuleBuilderState a -> m a
+
+  default liftModuleBuilderState
+    :: (MonadTrans t, MonadModuleBuilder m1, m ~ t m1)
+    => State ModuleBuilderState a
+    -> m a
+  liftModuleBuilderState = lift . liftModuleBuilderState
+
+instance Monad m => MonadModuleBuilder (ModuleBuilderT m) where
+  liftModuleBuilderState (StateT s) =
+    ModuleBuilderT $ StateT $ pure . runIdentity . s
+
+instance MonadModuleBuilder m => MonadModuleBuilder (IRBuilderT m)
+-- TODO other instances
 
 runModuleBuilderT :: Monad m => ModuleBuilderT m a -> m Module
-runModuleBuilderT (ModuleBuilder m) =
+runModuleBuilderT (ModuleBuilderT m) =
   Module . DList.toList . definitions <$> execStateT m beginState
   where
     beginState = ModuleBuilderState mempty mempty
 
 runModuleBuilder :: ModuleBuilder a -> Module
 runModuleBuilder = runIdentity . runModuleBuilderT
-
 
 function :: MonadModuleBuilder m => Name -> [Type] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
 function name tys retTy fnBody = do
@@ -99,11 +115,15 @@ function name tys retTy fnBody = do
 
 emitDefinition :: MonadModuleBuilder m => Definition -> m ()
 emitDefinition def =
-  modify $ \s -> s { definitions = DList.snoc (definitions s) def }
+  liftModuleBuilderState $ modify $ \s -> s { definitions = DList.snoc (definitions s) def }
+
+lookupType :: MonadModuleBuilder m => Name -> m (Maybe Type)
+lookupType name =
+  liftModuleBuilderState $ gets (Map.lookup name . types)
 
 addType :: MonadModuleBuilder m => Name -> Type -> m ()
 addType name ty =
-  modify $ \s -> s { types = Map.insert name ty (types s) }
+  liftModuleBuilderState $ modify $ \s -> s { types = Map.insert name ty (types s) }
 
 global :: MonadModuleBuilder m => Name -> Type -> Constant -> m Operand
 global name ty constant = do

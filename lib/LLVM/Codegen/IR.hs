@@ -14,6 +14,7 @@ import LLVM.NameSupply  -- TODO: separate import for name
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Pretty
+import Data.Maybe
 import Data.Word
 import Data.List.NonEmpty (NonEmpty(..), toList)
 
@@ -118,12 +119,14 @@ instance Pretty IR where
     PtrToInt val to ->
       prettyConvertOp "ptrtoint" val to
     Alloca ty numElems alignment ->
-      "alloca" <+> pretty ty <+> maybeDoc numElems (\count -> "," <+> pretty (typeOf count) <+> pretty count)
-                             <+> ", align" <+> pretty alignment
+      mconcat $ catMaybes [ Just $ "alloca" <+> pretty ty
+                          , (\count -> "," <+> pretty (typeOf count) <+> pretty count) <$> numElems
+                          , if alignment == 0 then Nothing else Just (", align" <+> pretty alignment)
+                          ]
     GetElementPtr inbounds pointer indices ->
       case typeOf pointer of
         ty@(PointerType innerTy) ->
-          "getelementptr" <+> optional inbounds "inbounds" <> pretty innerTy <> "," <> pretty ty <+>
+          "getelementptr" <+> optional inbounds "inbounds" <> pretty innerTy <> "," <+> pretty ty <+>
             pretty pointer <> "," <+> (commas $ map prettyIndex indices)
         _ ->
           error "Operand given to `getelementptr` that is not a pointer!"

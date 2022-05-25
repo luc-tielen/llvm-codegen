@@ -323,13 +323,103 @@ spec = describe "constructing LLVM IR" $ do
         }
         |]
 
-  it "supports 'alloca' instruction" pending
+  it "supports 'alloca' instruction" $ do
+    let ir = do
+          function "func" [i32] i32 $ \[a] -> do
+            _ <- alloca i64 Nothing 0
+            _ <- alloca i1 (Just $ int32 8) 0
+            _ <- alloca i1 Nothing 8
+            ret a
+    checkIR ir [text|
+      define external ccc i32 @func(i32 %0) {
+      start:
+        %1 = alloca i64
+        %2 = alloca i1, i32 8
+        %3 = alloca i1, align 8
+        ret i32 %0
+      }
+      |]
 
-  it "supports 'gep' instruction" pending
+  it "supports 'gep' instruction on pointers" $ do
+    let ir = do
+          function "func" [ptr i64, ptr (ptr (ptr i64))] (ptr i64) $ \[a, b] -> do
+            c <- gep a [int32 1]
+            _ <- gep b [int32 1, int32 2, int32 3]
+            ret c
+    checkIR ir [text|
+      define external ccc i64* @func(i64* %0, i64*** %1) {
+      start:
+        %2 = getelementptr i64, i64* %0, i32 1
+        %3 = getelementptr i64**, i64*** %1, i32 1, i32 2, i32 3
+        ret i64* %2
+      }
+      |]
 
-  it "supports 'load' instruction" pending
+  it "supports 'gep' instruction on structs" $ do
+    let ir = do
+          struct1 <- typedef "my_struct" (StructureType False [i32, i64])
+          struct2 <- typedef "my_struct2" (StructureType False [struct1, i1])
 
-  it "supports 'store' instruction" pending
+          function "func" [ptr struct2] (ptr i64) $ \[a] -> do
+            c <- gep a [int32 0, int32 0, int32 1]
+            _ <- gep a [int32 0, int32 1]
+            ret c
+    checkIR ir [text|
+      %my_struct = type {i32, i64}
+      %my_struct2 = type {%my_struct, i1}
+      define external ccc i64* @func(%my_struct2* %0) {
+      start:
+        %1 = getelementptr %my_struct2, %my_struct2* %0, i32 0, i32 0, i32 1
+        %2 = getelementptr %my_struct2, %my_struct2* %0, i32 0, i32 1
+        ret i64* %1
+      }
+      |]
+
+  it "supports 'gep' instruction on arrays" $ do
+    let ir = do
+          array <- typedef "my_struct" (ArrayType 10 i32)
+
+          function "func" [ptr array] (ptr i32) $ \[a] -> do
+            c <- gep a [int32 0, int32 5]
+            ret c
+    checkIR ir [text|
+      %my_struct = type [10 x i32]
+      define external ccc i32* @func(%my_struct* %0) {
+      start:
+        %1 = getelementptr %my_struct, %my_struct* %0, i32 0, i32 5
+        ret i32* %1
+      }
+      |]
+
+  it "supports 'load' instruction" $ do
+    let ir = do
+          function "func" [ptr i64] i64 $ \[a] -> do
+            b <- load a 0
+            _ <- load a 8
+            ret b
+    checkIR ir [text|
+      define external ccc i64 @func(i64* %0) {
+      start:
+        %1 = load i64, i64* %0
+        %2 = load i64, i64* %0, align 8
+        ret i64 %1
+      }
+      |]
+
+  it "supports 'store' instruction" $ do
+    let ir = do
+          function "func" [ptr i64] void $ \[a] -> do
+            store a 0 (int64 10)
+            store a 8 (int64 10)
+            retVoid
+    checkIR ir [text|
+      define external ccc void @func(i64* %0) {
+      start:
+        store i64 10, i64* %0
+        store i64 10, i64* %0, align 8
+        ret void
+      }
+      |]
 
   it "supports 'phi' instruction" $ do
     let ir = do

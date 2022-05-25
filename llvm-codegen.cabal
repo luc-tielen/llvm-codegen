@@ -30,6 +30,7 @@ library
       LLVM.Codegen
       LLVM.Codegen.IR
       LLVM.Codegen.IRBuilder
+      LLVM.Codegen.IRBuilder.Monad
       LLVM.Codegen.ModuleBuilder
       LLVM.Codegen.Operand
       LLVM.Codegen.Type
@@ -53,7 +54,7 @@ library
       FlexibleContexts
       FlexibleInstances
       ScopedTypeVariables
-      ConstraintKinds
+      DefaultSignatures
   ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits
   build-depends:
       base >=4.7 && <5
@@ -87,7 +88,7 @@ test-suite llvm-codegen-test
       FlexibleContexts
       FlexibleInstances
       ScopedTypeVariables
-      ConstraintKinds
+      DefaultSignatures
   ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits
   build-depends:
       base >=4.7 && <5
