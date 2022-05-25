@@ -41,6 +41,7 @@ spec = describe "constructing LLVM IR" $ do
           global "my_constant2" i64 (Int 64 1000)
     checkIR ir2 [text|
       @my_constant = global i32 42
+
       @my_constant2 = global i64 1000
       |]
 
@@ -56,12 +57,19 @@ spec = describe "constructing LLVM IR" $ do
           typedef "my_type2_packed" $ StructureType True [myType, myType]
     checkIR ir [text|
       %i1_synonym = type i1
+
       %i32_synonym = type i32
+
       %pointer_to_i32 = type i32*
+
       %ptr_to_ptr = type i32**
+
       %void_type = type void
+
       %my_type = type [10 x i16]
+
       %my_type2 = type {%my_type, %my_type}
+
       %my_type2_packed = type <{%my_type, %my_type}>
       |]
 
@@ -92,6 +100,7 @@ spec = describe "constructing LLVM IR" $ do
         %2 = add i32 %0, %1
         ret i32 %2
       }
+
       define external ccc i32 @do_add2(i32 %0, i32 %1) {
       start:
         %2 = add i32 %0, %1
@@ -366,7 +375,9 @@ spec = describe "constructing LLVM IR" $ do
             ret c
     checkIR ir [text|
       %my_struct = type {i32, i64}
+
       %my_struct2 = type {%my_struct, i1}
+
       define external ccc i64* @func(%my_struct2* %0) {
       start:
         %1 = getelementptr %my_struct2, %my_struct2* %0, i32 0, i32 0, i32 1
@@ -384,6 +395,7 @@ spec = describe "constructing LLVM IR" $ do
             ret c
     checkIR ir [text|
       %my_struct = type [10 x i32]
+
       define external ccc i32* @func(%my_struct* %0) {
       start:
         %1 = getelementptr %my_struct, %my_struct* %0, i32 0, i32 5

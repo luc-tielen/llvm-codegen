@@ -20,6 +20,7 @@ import Data.Map (Map)
 import qualified Data.DList as DList
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import qualified Data.List as L
 import Data.Functor.Identity
 import LLVM.Codegen.IRBuilder.Monad
 import LLVM.Codegen.Operand
@@ -33,7 +34,7 @@ data Module
 
 instance Pretty Module where
   pretty (Module defs) =
-    vsep $ map pretty defs
+    vsep $ L.intersperse mempty $ map pretty defs
 
 data Global
   = GlobalVariable Name Type Constant
