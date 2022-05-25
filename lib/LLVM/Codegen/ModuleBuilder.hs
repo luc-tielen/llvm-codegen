@@ -25,7 +25,7 @@ import Data.Functor.Identity
 import LLVM.Codegen.IRBuilder.Monad
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
-import LLVM.NameSupply
+import LLVM.Codegen.NameSupply
 import LLVM.Pretty
 
 

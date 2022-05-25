@@ -6,7 +6,7 @@ import Test.Hspec
 import Foreign hiding (void)
 import qualified LLVM.C.API as C
 import LLVM.Codegen.Type
-import LLVM.NameSupply  -- TODO only import Name
+import LLVM.Codegen.Name
 
 -- NOTE: if it can't find libffi, you're linking against wrong libLLVM!
 -- Be sure to update Setup.hs LLVM version as well to be in sync!

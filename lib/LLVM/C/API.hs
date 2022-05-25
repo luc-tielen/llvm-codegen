@@ -26,7 +26,7 @@ import Control.Exception
 import Data.Text (Text)
 import qualified Data.Text as T
 import LLVM.C.Bindings
-import LLVM.NameSupply  -- TODO only import Name
+import LLVM.Codegen.Name
 
 
 mkVoidType :: ForeignPtr Context -> IO (Ptr Type)

@@ -14,7 +14,7 @@ import qualified Data.DList as DList
 import Data.DList (DList)
 import Data.Monoid
 import Data.Maybe
-import LLVM.NameSupply
+import LLVM.Codegen.NameSupply
 import LLVM.Codegen.Operand
 import LLVM.Codegen.IR
 import LLVM.Pretty

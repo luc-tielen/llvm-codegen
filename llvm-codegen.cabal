@@ -32,9 +32,10 @@ library
       LLVM.Codegen.IRBuilder
       LLVM.Codegen.IRBuilder.Monad
       LLVM.Codegen.ModuleBuilder
+      LLVM.Codegen.Name
+      LLVM.Codegen.NameSupply
       LLVM.Codegen.Operand
       LLVM.Codegen.Type
-      LLVM.NameSupply
       LLVM.Pretty
   other-modules:
       Paths_llvm_codegen

@@ -9,8 +9,7 @@ module LLVM.Codegen.Type
   , void
   ) where
 
--- TODO: split into separate name module
-import LLVM.NameSupply (Name)
+import LLVM.Codegen.Name
 import LLVM.Pretty
 import Data.Word
 

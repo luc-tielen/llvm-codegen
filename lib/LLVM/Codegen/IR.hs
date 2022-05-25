@@ -10,7 +10,7 @@ module LLVM.Codegen.IR
   ) where
 
 import Prelude hiding (EQ)
-import LLVM.NameSupply  -- TODO: separate import for name
+import LLVM.Codegen.Name
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Pretty

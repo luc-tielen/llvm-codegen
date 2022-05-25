@@ -1,5 +1,4 @@
--- TODO: move to Codegen folder
-module LLVM.NameSupply
+module LLVM.Codegen.NameSupply
   ( Name(..)
   , Counter
   , NameSupplyState(..)
@@ -12,18 +11,10 @@ import Control.Monad.RWS.Lazy
 import Control.Monad.State.Lazy
 import qualified Data.Text as T
 import qualified Data.Map as M
-import Data.Text (Text)
 import Data.Map (Map)
 import Data.Maybe
-import Data.String
-import LLVM.Pretty
+import LLVM.Codegen.Name
 
-
-newtype Name = Name { unName :: Text }
-  deriving (Eq, Ord, Show)
-
-instance IsString Name where
-  fromString = Name . fromString
 
 type Counter = Int
 
@@ -73,8 +64,4 @@ instance MonadNameSupply m => MonadNameSupply (StateT s m) where
   fresh = lift fresh
   named = flip $ (mapStateT . flip named)
 
--- TODO other instances, default signatures
-
-instance Pretty Name where
-  pretty (Name name) =
-    pretty name
+-- TODO other instances, default signatures to reduce boilerplate

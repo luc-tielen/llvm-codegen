@@ -49,7 +49,7 @@ import qualified Data.DList as DList
 import Data.Monoid
 import Data.Maybe
 import Data.Word
-import LLVM.NameSupply
+import LLVM.Codegen.NameSupply
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Codegen.IR

@@ -6,7 +6,7 @@ module LLVM.Codegen
   , exampleModule -- TODO remove
   ) where
 
-import LLVM.NameSupply
+import LLVM.Codegen.NameSupply
 import LLVM.Codegen.IRBuilder
 import LLVM.Codegen.ModuleBuilder
 import LLVM.Codegen.Type

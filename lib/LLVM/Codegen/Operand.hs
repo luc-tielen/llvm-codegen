@@ -4,7 +4,7 @@ module LLVM.Codegen.Operand
   , typeOf
   ) where
 
-import LLVM.NameSupply (Name)
+import LLVM.Codegen.Name
 import LLVM.Codegen.Type
 import LLVM.Pretty
 import Data.Word
