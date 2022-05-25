@@ -14,7 +14,14 @@ module LLVM.Codegen.ModuleBuilder
   , lookupType
   ) where
 
-import Control.Monad.State
+import Control.Monad.State.Lazy (StateT(..), MonadState, State, execStateT, modify, gets)
+import qualified Control.Monad.State.Strict as StrictState
+import qualified Control.Monad.State.Lazy as LazyState
+import qualified Control.Monad.RWS.Lazy as LazyRWS
+import qualified Control.Monad.RWS.Strict as StrictRWS
+import Control.Monad.Reader
+import Control.Monad.Writer
+import Control.Monad.Except
 import Data.DList (DList)
 import Data.Map (Map)
 import qualified Data.DList as DList
@@ -95,7 +102,13 @@ instance Monad m => MonadModuleBuilder (ModuleBuilderT m) where
     ModuleBuilderT $ StateT $ pure . runIdentity . s
 
 instance MonadModuleBuilder m => MonadModuleBuilder (IRBuilderT m)
--- TODO other instances
+instance MonadModuleBuilder m => MonadModuleBuilder (StrictState.StateT s m)
+instance MonadModuleBuilder m => MonadModuleBuilder (LazyState.StateT s m)
+instance (MonadModuleBuilder m, Monoid w) => MonadModuleBuilder (StrictRWS.RWST r w s m)
+instance (MonadModuleBuilder m, Monoid w) => MonadModuleBuilder (LazyRWS.RWST r w s m)
+instance MonadModuleBuilder m => MonadModuleBuilder (ReaderT r m)
+instance (MonadModuleBuilder m, Monoid w) => MonadModuleBuilder (WriterT w m)
+instance MonadModuleBuilder m => MonadModuleBuilder (ExceptT e m)
 
 runModuleBuilderT :: Monad m => ModuleBuilderT m a -> m Module
 runModuleBuilderT (ModuleBuilderT m) =

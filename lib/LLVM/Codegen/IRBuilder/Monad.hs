@@ -7,12 +7,17 @@ module LLVM.Codegen.IRBuilder.Monad
 -- NOTE: this module only exists to solve a cyclic import
 
 import Prelude hiding (and)
-import Control.Monad.State
+import Control.Monad.State.Lazy (StateT(..), MonadState, modify, execStateT)
+import qualified Control.Monad.State.Strict as StrictState
+import qualified Control.Monad.State.Lazy as LazyState
+import qualified Control.Monad.RWS.Lazy as LazyRWS
+import qualified Control.Monad.RWS.Strict as StrictRWS
 import Control.Monad.Reader
+import Control.Monad.Writer
+import Control.Monad.Except
 import Data.Functor.Identity
 import qualified Data.DList as DList
 import Data.DList (DList)
-import Data.Monoid
 import Data.Maybe
 import LLVM.Codegen.NameSupply
 import LLVM.Codegen.Operand
@@ -81,7 +86,13 @@ class Monad m => MonadIRBuilder m where
 instance Monad m => MonadIRBuilder (IRBuilderT m) where
   modifyIRBuilderState = modify
 
--- TODO other instances
+instance MonadIRBuilder m => MonadIRBuilder (StrictState.StateT s m)
+instance MonadIRBuilder m => MonadIRBuilder (LazyState.StateT s m)
+instance (MonadIRBuilder m, Monoid w) => MonadIRBuilder (StrictRWS.RWST r w s m)
+instance (MonadIRBuilder m, Monoid w) => MonadIRBuilder (LazyRWS.RWST r w s m)
+instance MonadIRBuilder m => MonadIRBuilder (ReaderT r m)
+instance (MonadIRBuilder m, Monoid w) => MonadIRBuilder (WriterT w m)
+instance MonadIRBuilder m => MonadIRBuilder (ExceptT e m)
 
 instance Pretty BasicBlock where
   pretty (BB (Name name) stmts (Terminator term)) =
