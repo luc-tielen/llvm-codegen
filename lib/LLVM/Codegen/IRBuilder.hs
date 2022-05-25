@@ -113,19 +113,19 @@ modifyCurrentBlock f =
 
 add :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
 add lhs rhs =
-  emitInstr (typeOf lhs) $ Add False False lhs rhs
+  emitInstr (typeOf lhs) $ Add Off Off lhs rhs
 
 mul :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
 mul lhs rhs =
-  emitInstr (typeOf lhs) $ Mul False False lhs rhs
+  emitInstr (typeOf lhs) $ Mul Off Off lhs rhs
 
 sub :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
 sub lhs rhs =
-  emitInstr (typeOf lhs) $ Sub False False lhs rhs
+  emitInstr (typeOf lhs) $ Sub Off Off lhs rhs
 
 udiv :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
 udiv lhs rhs =
-  emitInstr (typeOf lhs) $ Udiv False lhs rhs
+  emitInstr (typeOf lhs) $ Udiv Off lhs rhs
 
 and :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
 and lhs rhs =
@@ -162,7 +162,7 @@ gep operand indices = do
   case resultType of
     Left err -> error err -- TODO
     Right ty ->
-      emitInstr ty $ GetElementPtr False operand indices
+      emitInstr ty $ GetElementPtr Off operand indices
 
 computeGepType :: (MonadModuleBuilder m, HasCallStack) => Type -> [Operand] -> m (Either String Type)
 computeGepType ty [] = pure $ Right $ PointerType ty
@@ -183,13 +183,13 @@ load :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m) => Operand -> Alignm
 load addr align =
   case typeOf addr of
     PointerType ty ->
-      emitInstr ty $ Load False addr Nothing align
+      emitInstr ty $ Load Off addr Nothing align
     _ ->
       error "Malformed AST: Expected a pointer type"
 
 store :: MonadIRBuilder m => Operand -> Alignment -> Operand -> m ()
 store addr align value =
-  emitInstrVoid $ Store False addr value Nothing align
+  emitInstrVoid $ Store Off addr value Nothing align
 
 phi :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m) => [(Operand, Name)] -> m Operand
 phi cases

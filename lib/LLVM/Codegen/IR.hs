@@ -1,3 +1,5 @@
+{-# LANGUAGE RoleAnnotations #-}
+
 module LLVM.Codegen.IR
   ( IR(..)
   , Terminator(..)
@@ -7,6 +9,12 @@ module LLVM.Codegen.IR
   , SynchronizationScope(..)
   , MemoryOrdering(..)
   , Alignment
+  , Flag(..)
+  , NUW
+  , NSW
+  , Exact
+  , Inbounds
+  , Volatile
   ) where
 
 import Prelude hiding (EQ)
@@ -18,12 +26,18 @@ import Data.Maybe
 import Data.Word
 import Data.List.NonEmpty (NonEmpty(..), toList)
 
--- TODO: create Flag datatype
-type NUW = Bool
-type NSW = Bool
-type Exact = Bool
-type Inbounds = Bool
-type Volatile = Bool
+data Flag a
+  = On
+  | Off
+  deriving Show
+
+type role Flag nominal
+
+data NUW
+data NSW
+data Exact
+data Inbounds
+data Volatile
 
 type Alignment = Word32
 
@@ -67,10 +81,10 @@ data CallingConvention
   deriving Show
 
 data IR
-  = Add NUW NSW Operand Operand
-  | Mul NUW NSW Operand Operand
-  | Sub NUW NSW Operand Operand
-  | Udiv Exact Operand Operand
+  = Add (Flag NUW) (Flag NSW) Operand Operand
+  | Mul (Flag NUW) (Flag NSW) Operand Operand
+  | Sub (Flag NUW) (Flag NSW) Operand Operand
+  | Udiv (Flag Exact) Operand Operand
   | And Operand Operand
   | Trunc Operand Type
   | Zext Operand Type
@@ -78,9 +92,9 @@ data IR
   | ICmp ComparisonType Operand Operand
   | PtrToInt Operand Type
   | Alloca Type (Maybe Operand) Int
-  | GetElementPtr Inbounds Operand [Operand]
-  | Load Volatile Operand (Maybe Atomicity) Alignment
-  | Store Volatile Operand Operand (Maybe Atomicity) Alignment
+  | GetElementPtr (Flag Inbounds) Operand [Operand]
+  | Load (Flag Volatile) Operand (Maybe Atomicity) Alignment
+  | Store (Flag Volatile) Operand Operand (Maybe Atomicity) Alignment
   | Phi (NonEmpty (Operand, Name))
   | Call (Maybe TailCallAttribute) CallingConvention Operand [Operand]  -- TODO support param attributes
   -- Terminators
@@ -232,7 +246,7 @@ instance Pretty MemoryOrdering where
     AcquireRelease         -> "acq_rel"
     SequentiallyConsistent -> "seq_cst"
 
-prettyArithBinOp :: Doc ann -> Bool -> Bool -> Operand -> Operand -> Doc ann
+prettyArithBinOp :: Doc ann -> Flag NUW -> Flag NSW -> Operand -> Operand -> Doc ann
 prettyArithBinOp opName nuw nsw a b =
   opName <+> optional nuw "nuw" <> optional nsw "nsw" <> pretty (typeOf a) <+> pretty a <> "," <+> pretty b
 
@@ -240,10 +254,10 @@ prettyConvertOp :: Doc ann -> Operand -> Type -> Doc ann
 prettyConvertOp opName val to =
   opName <+> pretty (typeOf val) <+> pretty val <+> "to" <+> pretty to
 
-optional :: Bool -> Doc ann -> Doc ann
-optional b doc = case b of
-  False -> mempty
-  True -> doc <> " "
+optional :: Flag a -> Doc ann -> Doc ann
+optional flag doc = case flag of
+  Off -> mempty
+  On -> doc <> " "
 
 maybeDoc :: Maybe a -> (a -> Doc ann) -> Doc ann
 maybeDoc = flip (maybe mempty)
