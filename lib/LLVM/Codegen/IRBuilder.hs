@@ -1,8 +1,11 @@
+{-# LANGUAGE RecursiveDo #-}
+
 module LLVM.Codegen.IRBuilder
   ( IRBuilderT
   , IRBuilder
   , block
   , named
+  , emitBlockStart
   , emitInstr
   , emitInstrVoid
   , emitTerminator
@@ -34,6 +37,11 @@ module LLVM.Codegen.IRBuilder
   , switch
   , select
 
+  , if'
+  , loop
+  , loopWhile
+  , loopFor
+
   , bit
   , int8
   , int16
@@ -44,10 +52,8 @@ module LLVM.Codegen.IRBuilder
 
 import Prelude hiding (and)
 import GHC.Stack
+import Control.Monad.Fix
 import qualified Data.List.NonEmpty as NE
-import qualified Data.DList as DList
-import Data.Monoid
-import Data.Maybe
 import Data.Word
 import LLVM.Codegen.NameSupply
 import LLVM.Codegen.Operand
@@ -55,58 +61,6 @@ import LLVM.Codegen.Type
 import LLVM.Codegen.IR
 import LLVM.Codegen.IRBuilder.Monad
 import LLVM.Codegen.ModuleBuilder
-
-
-block :: (MonadNameSupply m, MonadIRBuilder m) => m Name
-block = do
-  blockName <- getSuggestion >>= \case
-    Nothing -> do
-      fresh `named` "block"
-    Just _sugg ->
-      fresh
-
-  modifyIRBuilderState $ \s ->
-    let currBlock = currentBlock s
-        hasntStartedBlock = null (DList.toList (pbInstructions currBlock)) && isNothing (getFirst (pbTerminator currBlock))
-        blocks = basicBlocks s
-     in s { basicBlocks =
-              if hasntStartedBlock
-                then blocks
-                else DList.snoc blocks (partialBlockToBasicBlock currBlock)
-          , currentBlock = PartialBlock blockName mempty mempty
-          }
-  pure blockName
-
--- NOTE: Only used internally, this creates an unassigned operand
-mkOperand :: (MonadNameSupply m, MonadIRBuilder m) => Type -> m Operand
-mkOperand ty = do
-  name <- fresh
-  pure $ LocalRef ty name
-
-emitInstr :: (MonadNameSupply m, MonadIRBuilder m) => Type -> IR -> m Operand
-emitInstr ty instr = do
-  operand <- mkOperand ty
-  addInstrToCurrentBlock (Just operand) instr
-  pure operand
-
-emitInstrVoid :: MonadIRBuilder m => IR -> m ()
-emitInstrVoid instr =
-  addInstrToCurrentBlock Nothing instr
-
-addInstrToCurrentBlock :: MonadIRBuilder m => Maybe Operand -> IR -> m ()
-addInstrToCurrentBlock operand instr =
-  modifyCurrentBlock $ \blk ->
-    let instrs = DList.snoc (pbInstructions blk) (operand, instr)
-      in blk { pbInstructions = instrs }
-
-emitTerminator :: MonadIRBuilder m => Terminator -> m ()
-emitTerminator term =
-  modifyCurrentBlock $ \blk ->
-    blk { pbTerminator = First (Just term) <> pbTerminator blk }
-
-modifyCurrentBlock :: MonadIRBuilder m => (PartialBlock -> PartialBlock) -> m ()
-modifyCurrentBlock f =
-  modifyIRBuilderState $ \s -> s { currentBlock = f (currentBlock s) }
 
 
 -- Helpers for generating instructions:
@@ -233,6 +187,57 @@ switch value defaultDest dests =
 select :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> Operand -> m Operand
 select c t f =
   emitInstr (typeOf t) $ Select c t f
+
+if' :: (MonadNameSupply m, MonadIRBuilder m, MonadFix m)
+    => Operand -> m a -> m ()
+if' condition asm = mdo
+  condBr condition ifBlock end
+  ifBlock <- block `named` "if"
+  _ <- asm
+  br end
+  end <- block `named` "end_if"
+  pure ()
+
+loop :: (MonadNameSupply m, MonadIRBuilder m, MonadFix m) => m a -> m ()
+loop asm = mdo
+  br begin
+  begin <- block `named` "loop"
+  _ <- asm
+  br begin
+
+loopWhile :: (MonadNameSupply m, MonadIRBuilder m, MonadFix m)
+          => m Operand -> m a -> m ()
+loopWhile condition asm = mdo
+  br begin
+  begin <- block `named` "while_begin"
+  result <- condition
+  condBr result body end
+  body <- block `named` "while_body"
+  _ <- asm
+  br begin
+  end <- block `named` "while_end"
+  pure ()
+
+loopFor :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, MonadFix m)
+        => Operand
+        -> (Operand -> m Operand)
+        -> (Operand -> m Operand)
+        -> (Operand -> m a)
+        -> m ()
+loopFor beginValue condition post asm = mdo
+  start <- currentBlock
+  br begin
+  begin <- block `named` "for_begin"
+  loopValue <- phi [(beginValue, start), (updatedValue, bodyEnd)]
+  result <- condition loopValue
+  condBr result bodyStart end
+  bodyStart <- block `named` "for_body"
+  _ <- asm loopValue
+  updatedValue <- post loopValue
+  bodyEnd <- currentBlock
+  br begin
+  end <- block `named` "for_end"
+  pure ()
 
 bit :: Bool -> Operand
 bit b =

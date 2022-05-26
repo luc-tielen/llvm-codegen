@@ -1,7 +1,18 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module LLVM.Codegen.IRBuilder.Monad
-  ( module LLVM.Codegen.IRBuilder.Monad
+  ( IRBuilderT
+  , IRBuilder
+  , runIRBuilderT
+  , runIRBuilder
+  , MonadIRBuilder(..)
+  , BasicBlock(..)
+  , block
+  , emitBlockStart
+  , named
+  , emitInstr
+  , emitInstrVoid
+  , emitTerminator
   ) where
 
 -- NOTE: this module only exists to solve a cyclic import
@@ -24,6 +35,7 @@ import Data.Maybe
 import LLVM.Codegen.NameSupply
 import LLVM.Codegen.Operand
 import LLVM.Codegen.IR
+import LLVM.Codegen.Type
 import LLVM.Pretty
 
 
@@ -44,7 +56,7 @@ data PartialBlock
 data IRBuilderState
   = IRBuilderState
   { basicBlocks :: DList BasicBlock
-  , currentBlock :: PartialBlock
+  , currentPartialBlock :: PartialBlock
   }
 
 newtype IRBuilderT m a
@@ -71,7 +83,7 @@ runIRBuilderT (IRBuilderT m) = do
   where
     getBlocks irState =
       let previousBlocks = DList.apply (basicBlocks irState) mempty
-          currentBlk = currentBlock irState
+          currentBlk = currentPartialBlock irState
        in previousBlocks ++ [partialBlockToBasicBlock currentBlk]
 
 runIRBuilder :: IRBuilder a -> (a, [BasicBlock])
@@ -82,8 +94,67 @@ partialBlockToBasicBlock pb =
   let currentTerm = fromMaybe (Terminator $ Ret Nothing) $ getFirst $ pbTerminator pb
   in BB (pbName pb) (pbInstructions pb) currentTerm
 
+block :: (MonadNameSupply m, MonadIRBuilder m) => m Name
+block = do
+  blockName <- getSuggestion >>= \case
+    Nothing -> do
+      fresh `named` "block"
+    Just _sugg ->
+      fresh
+
+  emitBlockStart blockName
+  pure blockName
+
+emitBlockStart :: (MonadNameSupply m, MonadIRBuilder m) => Name -> m ()
+emitBlockStart blockName =
+  modifyIRBuilderState $ \s ->
+    let currBlock = currentPartialBlock s
+        hasntStartedBlock = null (DList.toList (pbInstructions currBlock)) && isNothing (getFirst (pbTerminator currBlock))
+        blocks = basicBlocks s
+     in s { basicBlocks =
+              if hasntStartedBlock
+                then blocks
+                else DList.snoc blocks (partialBlockToBasicBlock currBlock)
+          , currentPartialBlock = PartialBlock blockName mempty mempty
+          }
+
+-- NOTE: Only used internally, this creates an unassigned operand
+mkOperand :: (MonadNameSupply m, MonadIRBuilder m) => Type -> m Operand
+mkOperand ty = do
+  name <- fresh
+  pure $ LocalRef ty name
+
+emitInstr :: (MonadNameSupply m, MonadIRBuilder m) => Type -> IR -> m Operand
+emitInstr ty instr = do
+  operand <- mkOperand ty
+  addInstrToCurrentBlock (Just operand) instr
+  pure operand
+
+emitInstrVoid :: MonadIRBuilder m => IR -> m ()
+emitInstrVoid instr =
+  addInstrToCurrentBlock Nothing instr
+
+addInstrToCurrentBlock :: MonadIRBuilder m => Maybe Operand -> IR -> m ()
+addInstrToCurrentBlock operand instr =
+  modifyCurrentBlock $ \blk ->
+    let instrs = DList.snoc (pbInstructions blk) (operand, instr)
+      in blk { pbInstructions = instrs }
+
+emitTerminator :: MonadIRBuilder m => Terminator -> m ()
+emitTerminator term =
+  modifyCurrentBlock $ \blk ->
+    blk { pbTerminator = First (Just term) <> pbTerminator blk }
+
+modifyCurrentBlock :: MonadIRBuilder m => (PartialBlock -> PartialBlock) -> m ()
+modifyCurrentBlock f =
+  modifyIRBuilderState $ \s ->
+    s { currentPartialBlock = f (currentPartialBlock s) }
+
+
 class Monad m => MonadIRBuilder m where
   modifyIRBuilderState :: (IRBuilderState -> IRBuilderState) -> m ()
+
+  currentBlock :: m Name
 
   default modifyIRBuilderState
     :: (MonadTrans t, MonadIRBuilder m1, m ~ t m1)
@@ -91,8 +162,16 @@ class Monad m => MonadIRBuilder m where
     -> m ()
   modifyIRBuilderState = lift . modifyIRBuilderState
 
+  default currentBlock
+    :: (MonadTrans t, MonadIRBuilder m1, m ~ t m1)
+    => m Name
+  currentBlock =
+    lift currentBlock
+
 instance Monad m => MonadIRBuilder (IRBuilderT m) where
   modifyIRBuilderState = modify
+  currentBlock =
+    LazyState.gets (pbName . currentPartialBlock)
 
 instance MonadIRBuilder m => MonadIRBuilder (StrictState.StateT s m)
 instance MonadIRBuilder m => MonadIRBuilder (LazyState.StateT s m)
