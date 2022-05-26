@@ -8,6 +8,7 @@ module LLVM.Codegen.ModuleBuilder
   , MonadModuleBuilder
   , Module(..)
   , Definition(..)
+  , ParameterName(..)
   , function
   , global
   , typedef
@@ -25,6 +26,7 @@ import Control.Monad.Except
 import Control.Monad.Morph
 import Data.DList (DList)
 import Data.Map (Map)
+import Data.String
 import qualified Data.DList as DList
 import qualified Data.Map as Map
 import qualified Data.Text as T
@@ -36,7 +38,6 @@ import LLVM.Codegen.Type
 import LLVM.Codegen.NameSupply
 import LLVM.Pretty
 
-
 data Module
   = Module [Definition]
 
@@ -44,9 +45,17 @@ instance Pretty Module where
   pretty (Module defs) =
     vsep $ L.intersperse mempty $ map pretty defs
 
+data ParameterName
+  = ParameterName T.Text
+  | NoParameterName
+  deriving Show
+
+instance IsString ParameterName where
+  fromString = ParameterName . fromString
+
 data Global
   = GlobalVariable Name Type Constant
-  | Function Name Type [Type] [BasicBlock]
+  | Function Name Type [(Type, ParameterName)] [BasicBlock]
   deriving Show
 
 data Definition
@@ -65,15 +74,20 @@ instance Pretty Global where
   pretty = \case
     GlobalVariable name ty constant ->
       "@" <> pretty name <+> "=" <+> "global" <+> pretty ty <+> pretty constant
-    Function name retTy argTys body ->
-      "define external ccc" <+> pretty retTy <+> fnName <> tupled (zipWith prettyArg [0..] argTys) <+>
+    Function name retTy args body ->
+      "define external ccc" <+> pretty retTy <+> fnName <> tupled (zipWith prettyArg [0..] args) <+>
         "{" <> hardline <>
         prettyBody body <> hardline <>
         "}"
       where
         fnName = "@" <> pretty name
-        prettyArg :: Int -> Type -> Doc ann
-        prettyArg i argTy = pretty argTy <+> pretty (LocalRef argTy $ Name $ T.pack $ show i)
+        prettyArg :: Int -> (Type, ParameterName) -> Doc ann
+        prettyArg i (argTy, nm) =
+          case nm of
+            NoParameterName ->
+              pretty argTy <+> pretty (LocalRef argTy $ Name $ T.pack $ show i)
+            ParameterName paramName ->
+              pretty argTy <+> pretty (LocalRef argTy $ Name paramName)
         prettyBody blocks = vsep $ map pretty blocks
 
 data ModuleBuilderState
@@ -123,13 +137,15 @@ runModuleBuilderT (ModuleBuilderT m) =
 runModuleBuilder :: ModuleBuilder a -> Module
 runModuleBuilder = runIdentity . runModuleBuilderT
 
-function :: MonadModuleBuilder m => Name -> [Type] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
-function name tys retTy fnBody = do
-  instrs <- runIRBuilderT $ do
-    operands <- traverse mkOperand tys
-    fnBody operands
-  emitDefinition $ GlobalDefinition $ Function name retTy tys instrs
-  pure $ ConstantOperand $ GlobalRef (ptr (FunctionType retTy tys)) name
+function :: MonadModuleBuilder m => Name -> [(Type, ParameterName)] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
+function name args retTy fnBody = do
+  (names, instrs) <- runIRBuilderT $ do
+    (names, operands) <- unzip <$> traverse (uncurry mkOperand) args
+    _ <- fnBody operands
+    pure names
+  let args' = zipWith (\argName (ty, _) -> (ty, ParameterName $ unName argName)) names args
+  emitDefinition $ GlobalDefinition $ Function name retTy args' instrs
+  pure $ ConstantOperand $ GlobalRef (ptr (FunctionType retTy $ map fst args)) name
 
 emitDefinition :: MonadModuleBuilder m => Definition -> m ()
 emitDefinition def =
@@ -157,8 +173,10 @@ typedef name ty = do
 -- TODO add extra variant for opaque (no type provided) typedef (if needed)
 
 -- NOTE: Only used internally, this creates an unassigned operand
-mkOperand :: Monad m => Type -> IRBuilderT m Operand
-mkOperand ty = do
-  name <- fresh
-  pure $ LocalRef ty name
+mkOperand :: Monad m => Type -> ParameterName -> IRBuilderT m (Name, Operand)
+mkOperand ty paramName = do
+  name <- case paramName of
+    NoParameterName -> fresh
+    ParameterName name -> fresh `named` Name name
+  pure (name, LocalRef ty name)
 

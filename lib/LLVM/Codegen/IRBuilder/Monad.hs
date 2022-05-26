@@ -7,7 +7,8 @@ module LLVM.Codegen.IRBuilder.Monad
 -- NOTE: this module only exists to solve a cyclic import
 
 import Prelude hiding (and)
-import Control.Monad.State.Lazy (StateT(..), MonadState, modify, execStateT)
+import Control.Arrow hiding ((<+>))
+import Control.Monad.State.Lazy (StateT(..), MonadState, modify)
 import qualified Control.Monad.State.Strict as StrictState
 import qualified Control.Monad.State.Lazy as LazyState
 import qualified Control.Monad.RWS.Lazy as LazyRWS
@@ -62,15 +63,18 @@ instance MFunctor IRBuilderT where
 
 type IRBuilder = IRBuilderT Identity
 
-runIRBuilderT :: Monad m => IRBuilderT m a -> m [BasicBlock]
+runIRBuilderT :: Monad m => IRBuilderT m a -> m (a, [BasicBlock])
 runIRBuilderT (IRBuilderT m) = do
   let partialBlock = PartialBlock (Name "start") mempty mempty
-      result = runNameSupplyT $ execStateT m (IRBuilderState mempty partialBlock)
-  previousBlocks <- fmap (flip DList.apply mempty . basicBlocks) result
-  currentBlk <- fmap currentBlock result
-  pure $ previousBlocks ++ [partialBlockToBasicBlock currentBlk]
+      result = runNameSupplyT $ runStateT m (IRBuilderState mempty partialBlock)
+  fmap (second getBlocks) result
+  where
+    getBlocks irState =
+      let previousBlocks = DList.apply (basicBlocks irState) mempty
+          currentBlk = currentBlock irState
+       in previousBlocks ++ [partialBlockToBasicBlock currentBlk]
 
-runIRBuilder :: IRBuilder a -> [BasicBlock]
+runIRBuilder :: IRBuilder a -> (a, [BasicBlock])
 runIRBuilder = runIdentity . runIRBuilderT
 
 partialBlockToBasicBlock :: PartialBlock -> BasicBlock
