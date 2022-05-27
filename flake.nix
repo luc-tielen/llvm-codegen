@@ -11,7 +11,7 @@
     with fu.lib;
     eachSystem [ "x86_64-linux" ] (system:
       let
-        ghcVersion = "8107";
+        ghcVersion = "902";
         version = "${ghcVersion}.${substring 0 8 self.lastModifiedDate}.${
             self.shortRev or "dirty"
           }";
@@ -20,7 +20,10 @@
           let
             haskellPackages =
               final.haskell.packages."ghc${ghcVersion}".override {
-                overrides = hf: hp: {};
+                overrides = hf: hp: {
+                  llvm-codegen =
+                      (hf.callCabal2nix "llvm-codegen" ./. { });
+                };
               };
           in { inherit haskellPackages; };
 
