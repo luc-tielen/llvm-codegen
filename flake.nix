@@ -22,7 +22,9 @@
               final.haskell.packages."ghc${ghcVersion}".override {
                 overrides = hf: hp: {
                   llvm-codegen =
-                      (hf.callCabal2nix "llvm-codegen" ./. { });
+                    (hf.callCabal2nix "llvm-codegen" ./. {
+                      llvm-config = final.llvmPackages_13.llvm;
+                    });
                 };
               };
           in { inherit haskellPackages; };
