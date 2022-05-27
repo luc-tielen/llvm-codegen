@@ -1,4 +1,4 @@
-cabal-version: 1.24
+cabal-version: 2.0
 
 -- This file has been generated from package.yaml by hpack version 0.34.7.
 --
@@ -40,6 +40,8 @@ library
       LLVM.Pretty
   other-modules:
       Paths_llvm_codegen
+  autogen-modules:
+      Paths_llvm_codegen
   hs-source-dirs:
       lib
   default-extensions:
@@ -58,6 +60,8 @@ library
       ScopedTypeVariables
       DefaultSignatures
   ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits
+  build-tools:
+      llvm-config
   build-depends:
       base >=4.7 && <5
     , containers ==0.*
@@ -75,6 +79,8 @@ test-suite llvm-codegen-test
       Test.LLVM.C.APISpec
       Test.LLVM.Codegen.IRBuilderSpec
       Test.LLVM.Codegen.IRCombinatorsSpec
+      Paths_llvm_codegen
+  autogen-modules:
       Paths_llvm_codegen
   hs-source-dirs:
       tests
@@ -94,6 +100,8 @@ test-suite llvm-codegen-test
       ScopedTypeVariables
       DefaultSignatures
   ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits
+  build-tools:
+      llvm-config
   build-depends:
       base >=4.7 && <5
     , containers ==0.*
