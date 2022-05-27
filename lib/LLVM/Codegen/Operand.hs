@@ -13,12 +13,12 @@ import Data.Word
 data Constant
   = GlobalRef Type Name
   | Int Word32 Integer
-  deriving Show
+  deriving (Eq, Show)
 
 data Operand
   = LocalRef Type Name
   | ConstantOperand Constant
-  deriving Show
+  deriving (Eq, Show)
 
 typeOf :: Operand -> Type
 typeOf = \case

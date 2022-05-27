@@ -9,18 +9,12 @@ import Data.Foldable hiding (and)
 import Test.Hspec
 import NeatInterpolation
 import Data.Text (Text)
--- TODO use LLVM.Codegen import here?
-import LLVM.Codegen.ModuleBuilder
-import LLVM.Codegen.IRBuilder
-import LLVM.Codegen.Type
-import LLVM.Codegen.IR
-import LLVM.Codegen.Operand
-import LLVM.Pretty
+import LLVM.Codegen
 
 
 checkIR :: ModuleBuilder a -> Text -> IO ()
 checkIR llvmModule expectedOutput = do
-  let ir = renderDoc $ runModuleBuilder llvmModule
+  let ir = ppllvm $ runModuleBuilder llvmModule
   ir `shouldBe` expectedOutput
 
 spec :: Spec
@@ -527,7 +521,7 @@ spec = describe "constructing LLVM IR" $ do
       }
       |]
 
-  it "only uses last terminator instruction" $ do
+  it "only uses first terminator instruction" $ do
     let ir = do
           function "func" [] i1 $ \[] -> do
             ret (bit False)
@@ -535,7 +529,7 @@ spec = describe "constructing LLVM IR" $ do
     checkIR ir [text|
       define external ccc i1 @func() {
       start:
-        ret i1 1
+        ret i1 0
       }
       |]
 

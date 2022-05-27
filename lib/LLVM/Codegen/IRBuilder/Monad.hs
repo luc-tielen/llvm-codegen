@@ -143,7 +143,7 @@ addInstrToCurrentBlock operand instr =
 emitTerminator :: MonadIRBuilder m => Terminator -> m ()
 emitTerminator term =
   modifyCurrentBlock $ \blk ->
-    blk { pbTerminator = First (Just term) <> pbTerminator blk }
+    blk { pbTerminator = pbTerminator blk <> First (Just term) }
 
 modifyCurrentBlock :: MonadIRBuilder m => (PartialBlock -> PartialBlock) -> m ()
 modifyCurrentBlock f =

@@ -1,4 +1,4 @@
-{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE RecursiveDo, PolyKinds, RoleAnnotations #-}
 
 module LLVM.Codegen.IRBuilder
   ( IRBuilderT
@@ -37,10 +37,27 @@ module LLVM.Codegen.IRBuilder
   , switch
   , select
 
+  , eq
+  , ne
+  , sge
+  , sgt
+  , sle
+  , slt
+  , uge
+  , ugt
+  , ule
+  , ult
   , if'
   , loop
   , loopWhile
   , loopFor
+  , pointerDiff
+  , not'
+  , Signedness(..)
+  , minimum'
+  , allocate
+  , Path(..), (->>), mkPath
+  , addr, deref, assign, update, increment, copy, swap
 
   , bit
   , int8
@@ -50,10 +67,11 @@ module LLVM.Codegen.IRBuilder
   , intN
   ) where
 
-import Prelude hiding (and)
+import Prelude hiding (EQ, and)
 import GHC.Stack
 import Control.Monad.Fix
 import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Word
 import LLVM.Codegen.NameSupply
 import LLVM.Codegen.Operand
@@ -105,9 +123,23 @@ icmp :: (MonadNameSupply m, MonadIRBuilder m) => ComparisonType -> Operand -> Op
 icmp cmp a b =
   emitInstr i1 $ ICmp cmp a b
 
+eq, ne, sge, sgt, sle, slt, uge, ugt, ule, ult
+  :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
+eq = icmp EQ
+ne = icmp NE
+sge = icmp SGE
+sgt = icmp SGT
+sle = icmp SLE
+slt = icmp SLT
+uge = icmp UGE
+ugt = icmp UGT
+ule = icmp ULE
+ult = icmp ULT
+
+
 alloca :: (MonadNameSupply m, MonadIRBuilder m) => Type -> (Maybe Operand) -> Int -> m Operand
 alloca ty numElems alignment =
-  emitInstr ty $ Alloca ty numElems alignment
+  emitInstr (ptr ty) $ Alloca ty numElems alignment
 
 gep :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
     => Operand -> [Operand] -> m Operand
@@ -134,16 +166,16 @@ computeGepType ty _ =
   pure $ Left $ "Expecting aggregate type. (Malformed AST): " <> show ty
 
 load :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m) => Operand -> Alignment -> m Operand
-load addr align =
-  case typeOf addr of
+load address align =
+  case typeOf address of
     PointerType ty ->
-      emitInstr ty $ Load Off addr Nothing align
+      emitInstr ty $ Load Off address Nothing align
     _ ->
       error "Malformed AST: Expected a pointer type"
 
 store :: MonadIRBuilder m => Operand -> Alignment -> Operand -> m ()
-store addr align value =
-  emitInstrVoid $ Store Off addr value Nothing align
+store address align value =
+  emitInstrVoid $ Store Off address value Nothing align
 
 phi :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m) => [(Operand, Name)] -> m Operand
 phi cases
@@ -238,6 +270,104 @@ loopFor beginValue condition post asm = mdo
   br begin
   end <- block `named` "for_end"
   pure ()
+
+-- NOTE: diff is in bytes! (Different compared to C and C++)
+pointerDiff :: (MonadNameSupply m, MonadIRBuilder m)
+            => Type -> Operand -> Operand -> m Operand
+pointerDiff ty a b = do
+  a' <- ptrtoint a i64
+  b' <- ptrtoint b i64
+  result <- sub a' b'
+  trunc result ty
+
+-- | Calculates the logical not of a boolean 'Operand'.
+--   NOTE: This assumes the 'Operand' is of type 'i1', this is not checked!
+--   Passing in an argument of another width will lead to a crash in LLVM.
+not' :: (MonadNameSupply m, MonadIRBuilder m)
+     => Operand -> m Operand
+not' bool =
+  select bool (bit False) (bit True)
+
+data Signedness = Signed | Unsigned
+
+--   NOTE: No check is made if the 2 operands have the same 'Type'!
+minimum' :: (MonadNameSupply m, MonadIRBuilder m)
+         => Signedness -> Operand -> Operand -> m Operand
+minimum' sign a b = do
+  let inst = case sign of
+        Signed -> slt
+        Unsigned -> ult
+  isLessThan <- inst a b
+  select isLessThan a b
+
+allocate :: (MonadNameSupply m, MonadIRBuilder m) => Type -> Operand -> m Operand
+allocate ty beginValue = do
+  value <- alloca ty Nothing 0
+  store value 0 beginValue
+  pure value
+
+newtype Path (a :: k) (b :: k)
+  = Path (NonEmpty Operand)
+  deriving (Eq, Show)
+type role Path nominal nominal
+
+mkPath :: [Operand] -> Path a b
+mkPath path = Path (int32 0 :| path)
+
+(->>) :: Path a b -> Path b c -> Path a c
+Path a2b ->> Path b2c =
+  let b2c' = if NE.head b2c == int32 0
+               then NE.tail b2c
+               else NE.toList b2c
+   in Path $ NE.head a2b :| (NE.tail a2b ++ b2c')
+
+addr :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+     => Path a b -> Operand -> m Operand
+addr path p = gep p (pathToIndices path)
+  where
+    pathToIndices :: Path a b -> [Operand]
+    pathToIndices (Path indices) =
+      NE.toList indices
+
+deref :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+      => Path a b -> Operand -> m Operand
+deref path p = do
+  address <- addr path p
+  load address 0
+
+assign :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+       => Path a b -> Operand -> Operand -> m ()
+assign path p value = do
+  dstAddr <- addr path p
+  store dstAddr 0 value
+
+update :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+       => Path a b
+       -> Operand
+       -> (Operand -> m Operand)
+       -> m ()
+update path p f = do
+  dstAddr <- addr path p
+  store dstAddr 0 =<< f =<< load dstAddr 0
+
+increment :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+          => (Integer -> Operand) -> Path a b -> Operand -> m ()
+increment ty path p =
+  update path p (add (ty 1))
+
+copy :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+     => Path a b -> Operand -> Operand -> m ()
+copy path src dst = do
+  value <- deref path src
+  assign path dst value
+
+swap :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+     => Path a b -> Operand -> Operand -> m ()
+swap path lhs rhs = do
+  tmp <- deref path lhs
+  copy path rhs lhs
+  assign path rhs tmp
+
 
 bit :: Bool -> Operand
 bit b =
