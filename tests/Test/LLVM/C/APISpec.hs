@@ -7,6 +7,7 @@ import Foreign hiding (void)
 import qualified LLVM.C.API as C
 import LLVM.Codegen.Type
 import LLVM.Codegen.Name
+import LLVM.Codegen.Flag
 
 -- NOTE: if it can't find libffi, you're linking against wrong libLLVM!
 -- Be sure to update Setup.hs LLVM version as well to be in sync!
@@ -82,21 +83,21 @@ spec = describe "LLVM C API" $ parallel $ do
 
   it "can compute the size of a struct type" $ do
     assertTypeSizes $ \assert -> do
-      assert (StructureType False [i8]) 1
-      assert (StructureType False [i8, i8]) 2
-      assert (StructureType False [i8, i16]) 4  -- padding!
-      assert (StructureType True [i8, i16]) 3
-      assert (StructureType True [i8, StructureType False [i8]]) 2
-      assert (StructureType False [ArrayType 5 i32, i1]) 24  -- padding!
-      assert (StructureType True [ArrayType 5 i32, i1]) 21
-      assert (StructureType True [i32, i64]) 12  -- no padding, 4-byte alignment for i64?
+      assert (StructureType Off [i8]) 1
+      assert (StructureType Off [i8, i8]) 2
+      assert (StructureType Off [i8, i16]) 4  -- padding!
+      assert (StructureType On [i8, i16]) 3
+      assert (StructureType On [i8, StructureType Off [i8]]) 2
+      assert (StructureType Off [ArrayType 5 i32, i1]) 24  -- padding!
+      assert (StructureType On [ArrayType 5 i32, i1]) 21
+      assert (StructureType On [i32, i64]) 12  -- no padding, 4-byte alignment for i64?
 
   it "can compute the size of an array type" $ do
     assertTypeSizes $ \assert -> do
       assert (ArrayType 1 i1) 1
       assert (ArrayType 10 i1) 10
       assert (ArrayType 10 i32) 40
-      assert (ArrayType 5 (StructureType False [i32, i64])) (5 * 12)
+      assert (ArrayType 5 (StructureType Off [i32, i64])) (5 * 12)
 
   -- NOTE: not allowed for function type => has no size, triggers undefined behavior.
 

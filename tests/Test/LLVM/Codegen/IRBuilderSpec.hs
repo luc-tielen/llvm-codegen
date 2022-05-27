@@ -47,8 +47,8 @@ spec = describe "constructing LLVM IR" $ do
           _ <- typedef "ptr_to_ptr" (ptr (ptr i32))
           _ <- typedef "void_type" void
           myType <- typedef "my_type" $ ArrayType 10 i16
-          _ <- typedef "my_type2" $ StructureType False [myType, myType]
-          typedef "my_type2_packed" $ StructureType True [myType, myType]
+          _ <- typedef "my_type2" $ StructureType Off [myType, myType]
+          typedef "my_type2_packed" $ StructureType On [myType, myType]
     checkIR ir [text|
       %i1_synonym = type i1
 
@@ -387,8 +387,8 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'gep' instruction on structs" $ do
     let ir = do
-          struct1 <- typedef "my_struct" (StructureType False [i32, i64])
-          struct2 <- typedef "my_struct2" (StructureType False [struct1, i1])
+          struct1 <- typedef "my_struct" (StructureType Off [i32, i64])
+          struct2 <- typedef "my_struct2" (StructureType Off [struct1, i1])
 
           function "func" [(ptr struct2, "a")] (ptr i64) $ \[a] -> do
             c <- gep a [int32 0, int32 0, int32 1]

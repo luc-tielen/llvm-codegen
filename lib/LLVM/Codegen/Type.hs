@@ -1,5 +1,6 @@
 module LLVM.Codegen.Type
   ( Type(..)
+  , Packed
   , i1
   , i8
   , i16
@@ -10,18 +11,18 @@ module LLVM.Codegen.Type
   ) where
 
 import LLVM.Codegen.Name
+import LLVM.Codegen.Flag
 import LLVM.Pretty
 import Data.Word
 
--- TODO: flag
-type Packed = Bool
+data Packed
 
 data Type
   = IntType Word32
   | FunctionType Type [Type]
   | PointerType Type
   | VoidType
-  | StructureType Packed [Type]
+  | StructureType (Flag Packed) [Type]
   | ArrayType Word32 Type
   | NamedTypeReference Name
   deriving (Eq, Show)
@@ -52,7 +53,7 @@ instance Pretty Type where
     VoidType ->
       "void"
     StructureType packed elemTys
-      | packed ->
+      | packed == On ->
         "<{" <> (commas $ map pretty elemTys ) <> "}>"
       | otherwise ->
         "{" <> (commas $ map pretty elemTys ) <> "}"

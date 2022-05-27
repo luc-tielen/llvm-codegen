@@ -1,5 +1,3 @@
-{-# LANGUAGE RoleAnnotations #-}
-
 module LLVM.Codegen.IR
   ( IR(..)
   , Terminator(..)
@@ -21,17 +19,12 @@ import Prelude hiding (EQ)
 import LLVM.Codegen.Name
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
+import LLVM.Codegen.Flag
 import LLVM.Pretty
 import Data.Maybe
 import Data.Word
 import Data.List.NonEmpty (NonEmpty(..), toList)
 
-data Flag a
-  = On
-  | Off
-  deriving Show
-
-type role Flag nominal
 
 data NUW
 data NSW
@@ -108,7 +101,6 @@ data IR
 newtype Terminator
   = Terminator IR
   deriving Show
--- TODO use pattern synonyms for Terminator?
 
 instance Pretty IR where
   pretty = \case

@@ -146,7 +146,7 @@ gep :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
 gep operand indices = do
   resultType <- computeGepType (typeOf operand) indices
   case resultType of
-    Left err -> error err -- TODO
+    Left err -> error err
     Right ty ->
       emitInstr ty $ GetElementPtr Off operand indices
 

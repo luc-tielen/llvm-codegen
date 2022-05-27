@@ -27,6 +27,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import LLVM.C.Bindings
 import LLVM.Codegen.Name
+import LLVM.Codegen.Flag
+import qualified LLVM.Codegen.Type as LLVMType
 
 
 mkVoidType :: ForeignPtr Context -> IO (Ptr Type)
@@ -46,12 +48,12 @@ mkPointerType :: Ptr Type -> IO (Ptr Type)
 mkPointerType pointeeTy =
   llvmPointerTypeInContext pointeeTy 0
 
-mkStructType :: ForeignPtr Context -> [Ptr Type] -> Bool -> IO (Ptr Type)
+mkStructType :: ForeignPtr Context -> [Ptr Type] -> Flag LLVMType.Packed -> IO (Ptr Type)
 mkStructType ctx tys packed =
   withForeignPtr ctx $ \c ->
     withArray tys $ \tyArray -> do
       let count = CUInt $ fromIntegral $ length tys
-          packed' = CBool (if packed then 1 else 0)
+          packed' = CBool (if packed == On then 1 else 0)
       llvmStructTypeInContext c tyArray count packed'
 
 mkArrayType :: Ptr Type -> Word32 -> IO (Ptr Type)

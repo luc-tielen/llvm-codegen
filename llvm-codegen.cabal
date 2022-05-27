@@ -28,6 +28,7 @@ library
       LLVM.C.API
       LLVM.C.Bindings
       LLVM.Codegen
+      LLVM.Codegen.Flag
       LLVM.Codegen.IR
       LLVM.Codegen.IRBuilder
       LLVM.Codegen.IRBuilder.Monad

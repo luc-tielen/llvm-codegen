@@ -59,8 +59,6 @@ class Monad m => MonadNameSupply m where
   default getSuggestion :: (MonadTrans t, MonadNameSupply m1, m ~ t m1) => m (Maybe Name)
   getSuggestion = lift getSuggestion
 
-  -- TODO default impl for named? needs to abstract over natural transformation somehow? (look at instances below)
-
 instance Monad m => MonadNameSupply (NameSupplyT m) where
   getSuggestion = ask
 
