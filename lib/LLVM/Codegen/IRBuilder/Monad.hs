@@ -111,10 +111,19 @@ emitBlockStart blockName =
     let currBlock = currentPartialBlock s
         hasntStartedBlock = null (DList.toList (pbInstructions currBlock)) && isNothing (getFirst (pbTerminator currBlock))
         blocks = basicBlocks s
-     in s { basicBlocks =
-              if hasntStartedBlock
-                then blocks
-                else DList.snoc blocks (partialBlockToBasicBlock currBlock)
+        -- If the current block is empty:
+        --   Insert a dummy basic block that jumps directly to the next block, to avoid continuity errors.
+        --   Normally, LLVM should optimize this away since it is semantically a no-op.
+        -- Otherwise:
+        --   Append the current block to the existing list of blocks.
+        --
+        -- NOTE: This is different behavior compared to the llvm-hs-pure library,
+        -- but this avoids a lot of partial functions!
+        newBlock =
+          if hasntStartedBlock
+            then BB (pbName currBlock) mempty (Terminator $ Br blockName)
+            else partialBlockToBasicBlock currBlock
+     in s { basicBlocks = DList.snoc blocks newBlock
           , currentPartialBlock = PartialBlock blockName mempty mempty
           }
 

@@ -58,30 +58,6 @@ spec = describe "IR builder combinators" $ parallel $ do
       }
       |]
 
-  -- TODO: test the following (generates unexpected IR), only happens for blocks with no instrs -> label gets "deleted"
-    -- let ir = do
-    --       function "func" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> mdo
-    --         isZero <- eq a (int32 0)
-    --         if' isZero $ do
-    --           _ <- add a b
-    --           ret $ int32 1000
-    --           br blk
-    --
-    --         blk <- block
-    --         ret b
-    -- checkIR ir [text|
-    --   define external ccc i32 @func(i32 %a_0, i32 %b_0) {
-    --   start:
-    --     %0 = icmp eq i32 %a_0, 0
-    --     br i1 %0, label %if_0, label %end_if_0
-    --   if_0:
-    --     %1 = add i32 %a_0, %b_0
-    --     ret i32 1000
-    --   end_if_0:
-    --     ret i32 %b_0
-    --   }
-    --   |]
-
   it "supports 'loop' combinator" $ do
     let ir = do
           function "func" [] i32 $ \_ -> mdo

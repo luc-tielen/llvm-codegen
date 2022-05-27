@@ -112,6 +112,8 @@ spec = describe "constructing LLVM IR" $ do
             ret c
     checkIR ir [text|
       define external ccc i32 @do_add(i32 %a_0, i32 %b_0) {
+      start:
+        br label %block_0
       block_0:
         %0 = add i32 %a_0, %b_0
         ret i32 %0
@@ -121,12 +123,11 @@ spec = describe "constructing LLVM IR" $ do
   it "supports giving a basic block a user-defined name" $ do
     let ir = do
           function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> do
-            _ <- block `named` "begin"
             c <- add a b
             ret c
     checkIR ir [text|
       define external ccc i32 @do_add(i32 %a_0, i32 %b_0) {
-      begin_0:
+      start:
         %0 = add i32 %a_0, %b_0
         ret i32 %0
       }
@@ -135,12 +136,11 @@ spec = describe "constructing LLVM IR" $ do
   it "supports giving function parameters a user-defined name" $ do
     let ir = do
           function "do_add" [(i32, "arg0"), (i32, "arg1")] i32 $ \[a, b] -> do
-            _ <- block `named` "begin"
             c <- add a b
             ret c
     checkIR ir [text|
       define external ccc i32 @do_add(i32 %arg0_0, i32 %arg1_0) {
-      begin_0:
+      start:
         %0 = add i32 %arg0_0, %arg1_0
         ret i32 %0
       }
@@ -149,12 +149,11 @@ spec = describe "constructing LLVM IR" $ do
   it "supports automatic naming of function parameters" $ do
     let ir = do
           function "do_add" [(i32, NoParameterName), (i32, NoParameterName)] i32 $ \[a, b] -> do
-            _ <- block `named` "begin"
             c <- add a b
             ret c
     checkIR ir [text|
       define external ccc i32 @do_add(i32 %0, i32 %1) {
-      begin_0:
+      start:
         %2 = add i32 %0, %1
         ret i32 %2
       }
@@ -530,6 +529,32 @@ spec = describe "constructing LLVM IR" $ do
       define external ccc i1 @func() {
       start:
         ret i1 0
+      }
+      |]
+
+  it "doesn't emit a block if it has no instructions or terminator" $ do
+    let ir = do
+          function "func" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> mdo
+            isZero <- eq a (int32 0)
+            if' isZero $ do
+              _ <- add a b
+              ret $ int32 1000
+              br blk
+
+            blk <- block
+            ret b
+    checkIR ir [text|
+      define external ccc i32 @func(i32 %a_0, i32 %b_0) {
+      start:
+        %0 = icmp eq i32 %a_0, 0
+        br i1 %0, label %if_0, label %end_if_0
+      if_0:
+        %1 = add i32 %a_0, %b_0
+        ret i32 1000
+      end_if_0:
+        br label %block_0
+      block_0:
+        ret i32 %b_0
       }
       |]
 
