@@ -524,8 +524,8 @@ spec = describe "constructing LLVM IR" $ do
   it "only uses first terminator instruction" $ do
     let ir = do
           function "func" [] i1 $ \[] -> do
-            ret (bit False)
-            ret (bit True)
+            ret (bit 0)
+            ret (bit 1)
     checkIR ir [text|
       define external ccc i1 @func() {
       start:
@@ -583,7 +583,7 @@ spec = describe "constructing LLVM IR" $ do
   it "supports 'switch' instruction" $ do
     let ir = do
           function "func" [(i1, "a")] i1 $ \[a] -> mdo
-            switch a defaultBlock [(bit True, block1), (bit False, block2)]
+            switch a defaultBlock [(bit 1, block1), (bit 0, block2)]
             block1 <- block
             ret a
             block2 <- block
@@ -607,7 +607,7 @@ spec = describe "constructing LLVM IR" $ do
   it "supports 'select' instruction" $ do
     let ir = do
           function "not" [(i1, "a")] i1 $ \[a] -> do
-            b <- select a (bit False) (bit True)
+            b <- select a (bit 0) (bit 1)
             ret b
     checkIR ir [text|
       define external ccc i1 @not(i1 %a_0) {
@@ -620,7 +620,7 @@ spec = describe "constructing LLVM IR" $ do
   it "supports 'bit' for creating i1 values" $ do
     let ir = do
           function "func" [] i1 $ \[] -> do
-            ret (bit True)
+            ret (bit 1)
     checkIR ir [text|
       define external ccc i1 @func() {
       start:
@@ -629,7 +629,7 @@ spec = describe "constructing LLVM IR" $ do
       |]
     let ir2 = do
           function "func" [] i1 $ \[] -> do
-            ret (bit False)
+            ret (bit 0)
     checkIR ir2 [text|
       define external ccc i1 @func() {
       start:

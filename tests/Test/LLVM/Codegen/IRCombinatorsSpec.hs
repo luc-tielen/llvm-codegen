@@ -204,7 +204,7 @@ spec = describe "IR builder combinators" $ parallel $ do
   it "supports logical not" $ do
     let ir = do
           function "func" [] i32 $ \_ -> mdo
-            _ <- not' $ bit False
+            _ <- not' $ bit 0
             ret $ int32 42
     checkIR ir [text|
       define external ccc i32 @func() {

@@ -170,8 +170,8 @@ load address align =
   case typeOf address of
     PointerType ty ->
       emitInstr ty $ Load Off address Nothing align
-    _ ->
-      error "Malformed AST: Expected a pointer type"
+    t ->
+      error $ "Malformed AST: Expected a pointer type" <> show t
 
 store :: MonadIRBuilder m => Operand -> Alignment -> Operand -> m ()
 store address align value =
@@ -286,7 +286,7 @@ pointerDiff ty a b = do
 not' :: (MonadNameSupply m, MonadIRBuilder m)
      => Operand -> m Operand
 not' bool =
-  select bool (bit False) (bit True)
+  select bool (bit 0) (bit 1)
 
 data Signedness = Signed | Unsigned
 
@@ -369,9 +369,9 @@ swap path lhs rhs = do
   assign path rhs tmp
 
 
-bit :: Bool -> Operand
+bit :: Integer -> Operand
 bit b =
-  intN 1 $ if b then 1 else 0
+  intN 1 $ if b == 0 then 0 else 1
 
 int8 :: Integer -> Operand
 int8 =
