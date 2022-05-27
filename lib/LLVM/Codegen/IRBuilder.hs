@@ -373,21 +373,21 @@ bit :: Bool -> Operand
 bit b =
   intN 1 $ if b then 1 else 0
 
-int8 :: Int -> Operand
+int8 :: Integer -> Operand
 int8 =
-  intN 8 . toInteger
+  intN 8
 
-int16 :: Int -> Operand
+int16 :: Integer -> Operand
 int16 =
-  intN 16 . toInteger
+  intN 16
 
-int32 :: Int -> Operand
+int32 :: Integer -> Operand
 int32 =
-  intN 32 . toInteger
+  intN 32
 
-int64 :: Int -> Operand
+int64 :: Integer -> Operand
 int64 =
-  intN 64 . toInteger
+  intN 64
 
 intN :: Word32 -> Integer -> Operand
 intN bits value =
