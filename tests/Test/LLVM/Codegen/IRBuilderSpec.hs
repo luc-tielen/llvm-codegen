@@ -717,3 +717,13 @@ spec = describe "constructing LLVM IR" $ do
       }
       |]
 
+  it "supports 'nullPtr' for creating null values" $ do
+    let ir = do
+          function "func" [] (ptr i8) $ \[] -> do
+            ret $ nullPtr i8
+    checkIR ir [text|
+      define external ccc i8* @func() {
+      start:
+        ret i8* zeroinitializer
+      }
+      |]

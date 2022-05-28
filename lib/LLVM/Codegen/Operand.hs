@@ -13,6 +13,7 @@ import Data.Word
 data Constant
   = GlobalRef Type Name
   | Int Word32 Integer
+  | NullPtr Type
   deriving (Eq, Show)
 
 data Operand
@@ -32,6 +33,8 @@ typeOf = \case
         ty
       Int bits _ ->
         IntType bits
+      NullPtr ty ->
+        ptr ty
 
 instance Pretty Operand where
   pretty = \case
@@ -46,3 +49,5 @@ instance Pretty Constant where
       "@" <> pretty name
     Int _bits x ->
       pretty x
+    NullPtr _ ->
+      "zeroinitializer"

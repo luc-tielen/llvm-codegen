@@ -65,6 +65,7 @@ module LLVM.Codegen.IRBuilder
   , int32
   , int64
   , intN
+  , nullPtr
   ) where
 
 import Prelude hiding (EQ, and)
@@ -392,3 +393,7 @@ int64 =
 intN :: Word32 -> Integer -> Operand
 intN bits value =
   ConstantOperand $ Int bits value
+
+nullPtr :: Type -> Operand
+nullPtr =
+  ConstantOperand . NullPtr
