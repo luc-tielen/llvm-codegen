@@ -12,7 +12,7 @@ module LLVM.Codegen.IRBuilder
   , BasicBlock(..)
   , runIRBuilderT
   , runIRBuilder
-  , MonadIRBuilder
+  , MonadIRBuilder(..)
 
   , add
   , mul
