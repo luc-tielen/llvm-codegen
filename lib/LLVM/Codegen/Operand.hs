@@ -14,12 +14,12 @@ data Constant
   = GlobalRef Type Name
   | Int Word32 Integer
   | NullPtr Type
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data Operand
   = LocalRef Type Name
   | ConstantOperand Constant
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 typeOf :: Operand -> Type
 typeOf = \case

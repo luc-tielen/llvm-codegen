@@ -7,6 +7,6 @@ module LLVM.Codegen.Flag
 data Flag a
   = On
   | Off
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 type role Flag nominal

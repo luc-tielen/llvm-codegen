@@ -25,7 +25,7 @@ data Type
   | StructureType (Flag Packed) [Type]
   | ArrayType Word32 Type
   | NamedTypeReference Name
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 i1, i8, i16, i32, i64 :: Type
 i1 = IntType 1
