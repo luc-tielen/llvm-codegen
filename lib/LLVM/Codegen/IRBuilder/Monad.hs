@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, RankNTypes, MultiParamTypeClasses, UndecidableInstances #-}
 
 module LLVM.Codegen.IRBuilder.Monad
   ( IRBuilderT
@@ -60,12 +60,28 @@ data IRBuilderState
   }
 
 newtype IRBuilderT m a
-  = IRBuilderT { unIRBuilderT :: (StateT IRBuilderState (NameSupplyT m) a) }
+  = IRBuilderT { unIRBuilderT :: StateT IRBuilderState (NameSupplyT m) a }
   deriving ( Functor, Applicative, Monad, MonadFix, MonadIO
-           , MonadReader (Maybe Name), MonadState IRBuilderState
-           , MonadNameSupply
+           , MonadNameSupply, MonadError e
            )
   via StateT IRBuilderState (NameSupplyT m)
+
+instance MonadReader r m => MonadReader r (IRBuilderT m) where
+  ask = lift ask
+  local = mapIRBuilderT . local
+
+-- TODO MonadWriter
+
+mapIRBuilderT :: (Monad m, Monad n) => (m a -> n a) -> IRBuilderT m a -> IRBuilderT n a
+mapIRBuilderT f (IRBuilderT inner) =
+  IRBuilderT $ do
+    s <- LazyState.get
+    LazyState.mapStateT (mapNameSupplyT $ g s) inner
+  where
+    g s = fmap (,s) . f . fmap fst
+
+instance MonadState s m => MonadState s (IRBuilderT m) where
+  state = lift . StrictState.state
 
 instance MonadTrans IRBuilderT where
   lift = IRBuilderT . lift . lift
@@ -129,9 +145,8 @@ emitBlockStart blockName =
 
 -- NOTE: Only used internally, this creates an unassigned operand
 mkOperand :: (MonadNameSupply m, MonadIRBuilder m) => Type -> m Operand
-mkOperand ty = do
-  name <- fresh
-  pure $ LocalRef ty name
+mkOperand ty =
+  LocalRef ty <$> fresh
 
 emitInstr :: (MonadNameSupply m, MonadIRBuilder m) => Type -> IR -> m Operand
 emitInstr ty instr = do
@@ -140,8 +155,8 @@ emitInstr ty instr = do
   pure operand
 
 emitInstrVoid :: MonadIRBuilder m => IR -> m ()
-emitInstrVoid instr =
-  addInstrToCurrentBlock Nothing instr
+emitInstrVoid =
+  addInstrToCurrentBlock Nothing
 
 addInstrToCurrentBlock :: MonadIRBuilder m => Maybe Operand -> IR -> m ()
 addInstrToCurrentBlock operand instr =
@@ -178,9 +193,9 @@ class Monad m => MonadIRBuilder m where
     lift currentBlock
 
 instance Monad m => MonadIRBuilder (IRBuilderT m) where
-  modifyIRBuilderState = modify
+  modifyIRBuilderState = IRBuilderT . modify
   currentBlock =
-    LazyState.gets (pbName . currentPartialBlock)
+    IRBuilderT $ LazyState.gets (pbName . currentPartialBlock)
 
 instance MonadIRBuilder m => MonadIRBuilder (StrictState.StateT s m)
 instance MonadIRBuilder m => MonadIRBuilder (LazyState.StateT s m)

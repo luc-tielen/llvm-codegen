@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, UndecidableInstances #-}
 
 module LLVM.Codegen.ModuleBuilder
   ( ModuleBuilderT
@@ -38,7 +38,7 @@ import LLVM.Codegen.Type
 import LLVM.Codegen.NameSupply
 import LLVM.Pretty
 
-data Module
+newtype Module
   = Module [Definition]
 
 instance Pretty Module where
@@ -97,11 +97,31 @@ data ModuleBuilderState
   }
 
 newtype ModuleBuilderT m a
-  = ModuleBuilderT { unModuleBuilderT :: (StateT ModuleBuilderState m a) }
-  deriving (Functor, Applicative, Monad, MonadState ModuleBuilderState, MonadFix, MonadIO)
+  = ModuleBuilderT { unModuleBuilderT :: StateT ModuleBuilderState m a }
+  deriving ( Functor, Applicative, Monad, MonadFix, MonadIO
+           , MonadError e
+           )
   via StateT ModuleBuilderState m
 
 type ModuleBuilder = ModuleBuilderT Identity
+
+instance MonadTrans ModuleBuilderT where
+  lift = ModuleBuilderT . lift
+
+instance MonadReader r m => MonadReader r (ModuleBuilderT m) where
+  ask = lift ask
+  local = mapModuleBuilderT . local
+
+mapModuleBuilderT :: (Functor m, Monad n) => (m a -> n a) -> ModuleBuilderT m a -> ModuleBuilderT n a
+mapModuleBuilderT f (ModuleBuilderT inner) =
+  ModuleBuilderT $ do
+    s <- LazyState.get
+    LazyState.mapStateT (g s) inner
+  where
+    g s = fmap (,s) . f . fmap fst
+
+instance MonadState s m => MonadState s (ModuleBuilderT m) where
+  state = lift . LazyState.state
 
 instance MFunctor ModuleBuilderT where
   hoist nat = ModuleBuilderT . hoist nat . unModuleBuilderT

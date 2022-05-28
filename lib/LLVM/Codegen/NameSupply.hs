@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies, ScopedTypeVariables, MultiParamTypeClasses, UndecidableInstances #-}
 
 module LLVM.Codegen.NameSupply
   ( Name(..)
@@ -6,6 +6,7 @@ module LLVM.Codegen.NameSupply
   , NameSupplyState(..)
   , NameSupplyT(..)
   , runNameSupplyT
+  , mapNameSupplyT
   , MonadNameSupply(..)
   ) where
 
@@ -35,11 +36,32 @@ data NameSupplyState
 
 newtype NameSupplyT m a
   = NameSupplyT { unNameSupplyT :: RWST (Maybe Name) () NameSupplyState m a }
-  deriving (Functor, Applicative, Monad, MonadReader (Maybe Name), StrictState.MonadState NameSupplyState, MonadFix, MonadIO)
+  deriving ( Functor, Applicative, Monad
+           , MonadFix, MonadIO, MonadError e
+           , MonadReader (Maybe Name), StrictState.MonadState NameSupplyState
+           )
   via RWST (Maybe Name) () NameSupplyState m
 
 instance MonadTrans NameSupplyT where
   lift = NameSupplyT . lift
+
+instance StrictState.MonadState s m => StrictState.MonadState s (NameSupplyT m) where
+  state = lift . StrictState.state
+
+instance MonadReader r m => MonadReader r (NameSupplyT m) where
+  ask = lift ask
+  local = mapNameSupplyT . local
+
+-- TODO MonadWriter and other instances..
+
+mapNameSupplyT :: (Functor m, Monad n) => (m a -> n b) -> NameSupplyT m a -> NameSupplyT n b
+mapNameSupplyT nat (NameSupplyT m) =
+  NameSupplyT $ do
+    s <- LazyRWS.get
+    StrictRWS.mapRWST (fmap (g s) . nat . fmap f) m
+  where
+    f (a, _, _) = a
+    g s b = (b, s, ())
 
 instance MFunctor NameSupplyT where
   hoist nat = NameSupplyT . hoist nat . unNameSupplyT
@@ -60,14 +82,14 @@ class Monad m => MonadNameSupply m where
   getSuggestion = lift getSuggestion
 
 instance Monad m => MonadNameSupply (NameSupplyT m) where
-  getSuggestion = ask
+  getSuggestion = NameSupplyT ask
 
   fresh = getSuggestion >>= \case
-    Nothing -> do
+    Nothing -> NameSupplyT $ do
       count <- StrictState.gets counter
       StrictState.modify $ \s -> s { counter = count + 1 }
       pure $ Name $ T.pack (show count)
-    Just suggestion -> do
+    Just suggestion -> NameSupplyT $ do
       nameMapping <- StrictState.gets nameMap
       let mCount = M.lookup suggestion nameMapping
           count = fromMaybe 0 mCount
@@ -75,7 +97,7 @@ instance Monad m => MonadNameSupply (NameSupplyT m) where
       pure $ Name $ unName suggestion <> "_" <> T.pack (show count)
 
   m `named` name =
-    local (const $ Just name) m
+    NameSupplyT $ local (const $ Just name) $ unNameSupplyT m
 
 instance MonadNameSupply m => MonadNameSupply (StrictState.StateT s m) where
   named = flip (StrictState.mapStateT . flip named)
