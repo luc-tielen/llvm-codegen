@@ -67,6 +67,16 @@ spec = describe "constructing LLVM IR" $ do
       %my_type2_packed = type <{%my_type, %my_type}>
       |]
 
+  it "supports external definitions" $ do
+    let ir = do
+          _ <- extern "symbol1" [i32, i64] (ptr i8)
+          extern "symbol2" [] (ptr i8)
+    checkIR ir [text|
+      declare external ccc i8* @symbol1(i32, i64)
+
+      declare external ccc i8* @symbol2()
+      |]
+
   it "supports functions" $ do
     let ir = do
           function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> do

@@ -11,6 +11,7 @@ module LLVM.Codegen.ModuleBuilder
   , ParameterName(..)
   , function
   , global
+  , extern
   , typedef
   , lookupType
   ) where
@@ -74,11 +75,14 @@ instance Pretty Global where
   pretty = \case
     GlobalVariable name ty constant ->
       "@" <> pretty name <+> "=" <+> "global" <+> pretty ty <+> pretty constant
-    Function name retTy args body ->
-      "define external ccc" <+> pretty retTy <+> fnName <> tupled (zipWith prettyArg [0..] args) <+>
-        "{" <> hardline <>
-        prettyBody body <> hardline <>
-        "}"
+    Function name retTy args body
+      | null body ->
+        "declare external ccc" <+> pretty retTy <+> fnName <> tupled (map (pretty . fst) args)
+      | otherwise ->
+        "define external ccc" <+> pretty retTy <+> fnName <> tupled (zipWith prettyArg [0..] args) <+>
+          "{" <> hardline <>
+          prettyBody body <> hardline <>
+          "}"
       where
         fnName = "@" <> pretty name
         prettyArg :: Int -> (Type, ParameterName) -> Doc ann
@@ -189,6 +193,13 @@ typedef name ty = do
   emitDefinition $ TypeDefinition name ty
   addType name ty
   pure $ NamedTypeReference name
+
+extern :: MonadModuleBuilder m => Name -> [Type] -> Type -> m Operand
+extern name argTys retTy = do
+  let args = [(argTy, ParameterName "") | argTy <- argTys]
+  emitDefinition $ GlobalDefinition $ Function name retTy args []
+  let fnTy = ptr $ FunctionType retTy argTys
+  pure $ ConstantOperand $ GlobalRef fnTy name
 
 -- TODO add extra variant for opaque (no type provided) typedef (if needed)
 
