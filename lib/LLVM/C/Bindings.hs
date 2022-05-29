@@ -18,6 +18,8 @@ module LLVM.C.Bindings
   , llvmIntTypeInContext
   , llvmPointerTypeInContext
   , llvmStructTypeInContext
+  , llvmNamedStructTypeInContext
+  , llvmNamedStructSetBody
   , llvmArrayTypeInContext
   , llvmFunctionTypeInContext
   , llvmGetTypeByNameInContext
@@ -78,6 +80,12 @@ foreign import ccall unsafe "LLVMPointerType" llvmPointerTypeInContext
 
 foreign import ccall unsafe "LLVMStructTypeInContext" llvmStructTypeInContext
   :: Ptr Context -> Ptr (Ptr Type) -> CUInt -> CBool -> IO (Ptr Type)
+
+foreign import ccall unsafe "LLVMStructCreateNamed" llvmNamedStructTypeInContext
+  :: Ptr Context -> CString -> IO (Ptr Type)
+
+foreign import ccall unsafe "LLVMStructSetBody" llvmNamedStructSetBody
+  :: Ptr Context -> Ptr Type -> Ptr (Ptr Type) -> CUInt -> CBool -> IO (Ptr Type)
 
 foreign import ccall unsafe "LLVMArrayType" llvmArrayTypeInContext
   :: Ptr Type -> CUInt -> IO (Ptr Type)

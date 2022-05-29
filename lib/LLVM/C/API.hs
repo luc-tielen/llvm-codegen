@@ -8,13 +8,15 @@ module LLVM.C.API
   , getTargetData
   , sizeOfType
 
+  , getTypeByName
   , mkVoidType
   , mkIntType
   , mkPointerType
-  , mkStructType
   , mkArrayType
   , mkFunctionType
-  , getTypeByName
+  , mkAnonStructType
+  , mkOpaqueStructType
+  , setNamedStructBody
   ) where
 
 import Data.Word
@@ -48,13 +50,32 @@ mkPointerType :: Ptr Type -> IO (Ptr Type)
 mkPointerType pointeeTy =
   llvmPointerTypeInContext pointeeTy 0
 
-mkStructType :: ForeignPtr Context -> [Ptr Type] -> Flag LLVMType.Packed -> IO (Ptr Type)
-mkStructType ctx tys packed =
+mkAnonStructType :: ForeignPtr Context -> [Ptr Type] -> Flag LLVMType.Packed -> IO (Ptr Type)
+mkAnonStructType ctx tys packed =
   withForeignPtr ctx $ \c ->
     withArray tys $ \tyArray -> do
       let count = CUInt $ fromIntegral $ length tys
           packed' = CBool (if packed == On then 1 else 0)
       llvmStructTypeInContext c tyArray count packed'
+
+-- NOTE: can be used to forward declare a struct type
+mkOpaqueStructType :: ForeignPtr Context -> Name -> IO (Ptr Type)
+mkOpaqueStructType ctx name =
+  withForeignPtr ctx $ \c ->
+    withNameAsCString name $ \nm ->
+      llvmNamedStructTypeInContext c nm
+
+withNameAsCString :: Name -> (CString -> IO a) -> IO a
+withNameAsCString name  =
+  withCString (T.unpack $ unName name)
+
+setNamedStructBody :: ForeignPtr Context -> Ptr Type -> [Ptr Type] -> Flag LLVMType.Packed -> IO (Ptr Type)
+setNamedStructBody ctx structTy tys packed =
+  withForeignPtr ctx $ \c ->
+    withArray tys $ \tyArray -> do
+      let count = CUInt $ fromIntegral $ length tys
+          packed' = CBool (if packed == On then 1 else 0)
+      llvmNamedStructSetBody c structTy tyArray count packed'
 
 mkArrayType :: Ptr Type -> Word32 -> IO (Ptr Type)
 mkArrayType elemTy count =
