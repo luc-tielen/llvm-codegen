@@ -14,6 +14,7 @@ data Constant
   = GlobalRef Type Name
   | Int Word32 Integer
   | NullPtr Type
+  | Undef Type
   deriving (Eq, Ord, Show)
 
 data Operand
@@ -35,6 +36,8 @@ typeOf = \case
         IntType bits
       NullPtr ty ->
         ptr ty
+      Undef ty ->
+        ty
 
 instance Pretty Operand where
   pretty = \case
@@ -51,3 +54,5 @@ instance Pretty Constant where
       pretty x
     NullPtr _ ->
       "zeroinitializer"
+    Undef _ ->
+      "undef"

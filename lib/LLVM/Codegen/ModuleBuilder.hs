@@ -79,9 +79,9 @@ instance Pretty Global where
       "@" <> pretty name <+> "=" <+> "global" <+> pretty ty <+> pretty constant
     Function name retTy args body
       | null body ->
-        "declare external ccc" <+> pretty retTy <+> fnName <> tupled (map (pretty . fst) args)
+        "declare external ccc" <+> pretty retTy <+> fnName <> toTuple (map (pretty . fst) args)
       | otherwise ->
-        "define external ccc" <+> pretty retTy <+> fnName <> tupled (zipWith prettyArg [0..] args) <+>
+        "define external ccc" <+> pretty retTy <+> fnName <> toTuple (zipWith prettyArg [0..] args) <+>
           "{" <> hardline <>
           prettyBody body <> hardline <>
           "}"
@@ -95,6 +95,10 @@ instance Pretty Global where
             ParameterName paramName ->
               pretty argTy <+> pretty (LocalRef argTy $ Name paramName)
         prettyBody blocks = vsep $ map pretty blocks
+        toTuple argDocs =
+          parens $ argDocs `sepBy` ", "
+        sepBy docs separator =
+          mconcat $ L.intersperse separator docs
 
 data ModuleBuilderState
   = ModuleBuilderState
