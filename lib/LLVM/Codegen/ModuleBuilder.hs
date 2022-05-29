@@ -13,6 +13,7 @@ module LLVM.Codegen.ModuleBuilder
   , global
   , extern
   , typedef
+  , getTypedefs
   , lookupType
   ) where
 
@@ -174,6 +175,10 @@ function name args retTy fnBody = do
 emitDefinition :: MonadModuleBuilder m => Definition -> m ()
 emitDefinition def =
   liftModuleBuilderState $ modify $ \s -> s { definitions = DList.snoc (definitions s) def }
+
+getTypedefs :: MonadModuleBuilder m => m (Map Name Type)
+getTypedefs =
+  liftModuleBuilderState $ gets types
 
 lookupType :: MonadModuleBuilder m => Name -> m (Maybe Type)
 lookupType name =
