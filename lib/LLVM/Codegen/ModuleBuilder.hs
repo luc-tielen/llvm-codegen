@@ -37,6 +37,7 @@ import Data.Functor.Identity
 import LLVM.Codegen.IRBuilder.Monad
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
+import LLVM.Codegen.Flag
 import LLVM.Codegen.NameSupply
 import LLVM.Pretty
 
@@ -193,11 +194,17 @@ global name ty constant = do
   emitDefinition $ GlobalDefinition $ GlobalVariable name ty constant
   pure $ ConstantOperand $ GlobalRef (ptr ty) name
 
-typedef :: MonadModuleBuilder m => Name -> Type -> m Type
-typedef name ty = do
+-- NOTE: typedefs are only allowed for structs, even though clang also allows it
+-- for primitive types. This is done to avoid weird inconsistencies with the LLVM JIT
+-- (where this is not allowed).
+typedef :: MonadModuleBuilder m => Name -> Flag Packed -> [Type] -> m Type
+typedef name packed tys = do
+  let ty = StructureType packed tys
   emitDefinition $ TypeDefinition name ty
   addType name ty
   pure $ NamedTypeReference name
+
+-- TODO add extra variant for opaque (no type provided) typedef (if needed)
 
 extern :: MonadModuleBuilder m => Name -> [Type] -> Type -> m Operand
 extern name argTys retTy = do
@@ -205,8 +212,6 @@ extern name argTys retTy = do
   emitDefinition $ GlobalDefinition $ Function name retTy args []
   let fnTy = ptr $ FunctionType retTy argTys
   pure $ ConstantOperand $ GlobalRef fnTy name
-
--- TODO add extra variant for opaque (no type provided) typedef (if needed)
 
 -- NOTE: Only used internally, this creates an unassigned operand
 mkOperand :: Monad m => Type -> ParameterName -> IRBuilderT m (Name, Operand)
