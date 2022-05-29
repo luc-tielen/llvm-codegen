@@ -70,7 +70,7 @@ withNameAsCString name  =
   withCString (T.unpack $ unName name)
 
 -- NOTE: call this on a Type returned by 'mkOpaqueStructType' to define the struct body of that type.
-setNamedStructBody :: ForeignPtr Context -> Ptr Type -> [Ptr Type] -> Flag LLVMType.Packed -> IO (Ptr Type)
+setNamedStructBody :: ForeignPtr Context -> Ptr Type -> [Ptr Type] -> Flag LLVMType.Packed -> IO ()
 setNamedStructBody ctx structTy tys packed =
   withForeignPtr ctx $ \c ->
     withArray tys $ \tyArray -> do
