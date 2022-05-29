@@ -70,13 +70,12 @@ withNameAsCString name  =
   withCString (T.unpack $ unName name)
 
 -- NOTE: call this on a Type returned by 'mkOpaqueStructType' to define the struct body of that type.
-setNamedStructBody :: ForeignPtr Context -> Ptr Type -> [Ptr Type] -> Flag LLVMType.Packed -> IO ()
-setNamedStructBody ctx structTy tys packed =
-  withForeignPtr ctx $ \c ->
-    withArray tys $ \tyArray -> do
-      let count = CUInt $ fromIntegral $ length tys
-          packed' = CBool (if packed == On then 1 else 0)
-      llvmNamedStructSetBody c structTy tyArray count packed'
+setNamedStructBody :: Ptr Type -> [Ptr Type] -> Flag LLVMType.Packed -> IO ()
+setNamedStructBody structTy tys packed =
+  withArray tys $ \tyArray -> do
+    let count = CUInt $ fromIntegral $ length tys
+        packed' = CBool (if packed == On then 1 else 0)
+    llvmNamedStructSetBody structTy tyArray count packed'
 
 mkArrayType :: Ptr Type -> Word32 -> IO (Ptr Type)
 mkArrayType elemTy count =
