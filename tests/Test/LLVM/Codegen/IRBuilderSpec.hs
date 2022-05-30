@@ -614,7 +614,7 @@ spec = describe "constructing LLVM IR" $ do
     checkIR ir [text|
       define external ccc i1 @func(i1 %a_0) {
       start:
-        switch i1 %a_0, block_2 [i1 1, label block_0, i1 0, label block_1]
+        switch i1 %a_0, %block_2 [i1 1, label %block_0, i1 0, label %block_1]
       block_0:
         ret i1 %a_0
       block_1:

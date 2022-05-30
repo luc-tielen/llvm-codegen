@@ -189,11 +189,11 @@ instance Pretty IR where
     CondBr cond trueLabel falseLabel ->
       "br i1" <+> pretty cond <> ", label" <+> "%" <> pretty trueLabel <> ", label" <+> "%" <> pretty falseLabel
     Switch val defaultLabel cases ->
-      "switch" <+> pretty (typeOf val) <+> pretty val <> "," <+> pretty defaultLabel <+>
+      "switch" <+> pretty (typeOf val) <+> pretty val <> "," <+> "%" <> pretty defaultLabel <+>
         list (map prettyCase cases)
       where
         prettyCase (caseVal, label) =
-          pretty (typeOf caseVal) <+> pretty caseVal <> ", label" <+> pretty label
+          pretty (typeOf caseVal) <+> pretty caseVal <> ", label" <+> "%" <> pretty label
     Select c t f ->
       "select" <+> pretty (typeOf c) <+> pretty c <> "," <+>
         pretty (typeOf t) <+> pretty t <> "," <+>
