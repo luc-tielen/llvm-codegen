@@ -32,7 +32,7 @@
                             substring 0 8 self.lastModifiedDate
                           }.${self.shortRev or "dirty"}";
                       }));
-                }) (hf: hp: { llvm-config = f.llvmPackages_13.llvm; }) hf hp);
+                }) (hf: hp: { llvm-config = f.llvmPackages_14.llvm; }) hf hp);
 
             # all haskellPackages
             allHaskellPackages = let
