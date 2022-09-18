@@ -39,6 +39,23 @@ spec = describe "constructing LLVM IR" $ do
       @my_constant2 = global i64 1000
       |]
 
+  it "supports creating and using global utf8 string constants" $ do
+    let ir = do
+          function "utf8_string_usage" [] i8 $ \[] -> do
+            str <- globalUtf8StringPtr "string_contents" "my_string"
+            char <- load str 0
+            ret char
+    checkIR ir [text|
+      @my_string = global [16 x i8] [i8 115, i8 116, i8 114, i8 105, i8 110, i8 103, i8 95, i8 99, i8 111, i8 110, i8 116, i8 101, i8 110, i8 116, i8 115, i8 0]
+
+      define external ccc i8 @utf8_string_usage() {
+      start:
+        %0 = getelementptr inbounds [16 x i8], [16 x i8]* @my_string, i32 0, i32 0
+        %1 = load i8, i8* %0
+        ret i8 %1
+      }
+      |]
+
   it "supports type definitions" $ do
     let ir = mdo
           let myType = ArrayType 10 i16
