@@ -67,7 +67,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports functions" $ do
     let ir = do
-          function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> do
+          function "do_add" [(i32, "a"), (i32, "b")] i32 [] $ \[a, b] -> do
             c <- add a b
             ret c
     checkIR ir [text|
@@ -80,10 +80,10 @@ spec = describe "constructing LLVM IR" $ do
 
   it "renders functions in order they are defined" $ do
     let ir = do
-          _ <- function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> do
+          _ <- function "do_add" [(i32, "a"), (i32, "b")] i32 [] $ \[a, b] -> do
             c <- add a b
             ret c
-          function "do_add2" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> do
+          function "do_add2" [(i32, "a"), (i32, "b")] i32 [] $ \[a, b] -> do
             c <- add a b
             ret c
     checkIR ir [text|
@@ -104,7 +104,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports defining basic blocks" $ do
     let ir = do
-          function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> do
+          function "do_add" [(i32, "a"), (i32, "b")] i32 [] $ \[a, b] -> do
             _ <- block
             c <- add a b
             ret c
@@ -120,7 +120,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports giving a basic block a user-defined name" $ do
     let ir = do
-          function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> do
+          function "do_add" [(i32, "a"), (i32, "b")] i32 [] $ \[a, b] -> do
             c <- add a b
             ret c
     checkIR ir [text|
@@ -133,7 +133,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports giving function parameters a user-defined name" $ do
     let ir = do
-          function "do_add" [(i32, "arg0"), (i32, "arg1")] i32 $ \[a, b] -> do
+          function "do_add" [(i32, "arg0"), (i32, "arg1")] i32 [] $ \[a, b] -> do
             c <- add a b
             ret c
     checkIR ir [text|
@@ -146,7 +146,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports automatic naming of function parameters" $ do
     let ir = do
-          function "do_add" [(i32, NoParameterName), (i32, NoParameterName)] i32 $ \[a, b] -> do
+          function "do_add" [(i32, NoParameterName), (i32, NoParameterName)] i32 [] $ \[a, b] -> do
             c <- add a b
             ret c
     checkIR ir [text|
@@ -159,7 +159,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "automatically terminates previous basic block when starting new block" $ do
     let ir = do
-          function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> mdo
+          function "do_add" [(i32, "a"), (i32, "b")] i32 [] $ \[a, b] -> mdo
             c <- add a b
             -- NOTE: invalid IR
             _ <- block `named` "next"
@@ -176,7 +176,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports giving instruction operands a user-defined name" $ do
     let ir = do
-          function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> mdo
+          function "do_add" [(i32, "a"), (i32, "b")] i32 [] $ \[a, b] -> mdo
             c <- add a b `named` "c"
             d' <- flip named "d" $ do
               d <- add b c
@@ -194,7 +194,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "avoids name collissions by appending a unique suffix" $ do
     let ir = do
-          function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> mdo
+          function "do_add" [(i32, "a"), (i32, "b")] i32 [] $ \[a, b] -> mdo
             c <- flip named "c" $ do
               c0 <- add a b
               add c0 c0
@@ -210,7 +210,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'add' instruction" $ do
     let ir = do
-          function "do_add" [(i8, "a"), (i8, "b")] i8 $ \[a, b] -> do
+          function "do_add" [(i8, "a"), (i8, "b")] i8 [] $ \[a, b] -> do
             c <- add a b
             ret c
     checkIR ir [text|
@@ -223,7 +223,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'mul' instruction" $ do
     let ir = do
-          function "func" [(i8, "a"), (i8, "b")] i8 $ \[a, b] -> do
+          function "func" [(i8, "a"), (i8, "b")] i8 [] $ \[a, b] -> do
             c <- mul a b
             ret c
     checkIR ir [text|
@@ -236,7 +236,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'sub' instruction" $ do
     let ir = do
-          function "func" [(i8, "a"), (i8, "b")] i8 $ \[a, b] -> do
+          function "func" [(i8, "a"), (i8, "b")] i8 [] $ \[a, b] -> do
             c <- sub a b
             ret c
     checkIR ir [text|
@@ -249,7 +249,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'udiv' instruction" $ do
     let ir = do
-          function "func" [(i8, "a"), (i8, "b")] i8 $ \[a, b] -> do
+          function "func" [(i8, "a"), (i8, "b")] i8 [] $ \[a, b] -> do
             c <- udiv a b
             ret c
     checkIR ir [text|
@@ -262,7 +262,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'and' instruction" $ do
     let ir = do
-          function "func" [(i1, "a"), (i1, "b")] i1 $ \[a, b] -> do
+          function "func" [(i1, "a"), (i1, "b")] i1 [] $ \[a, b] -> do
             c <- and a b
             ret c
     checkIR ir [text|
@@ -275,7 +275,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'trunc' instruction" $ do
     let ir = do
-          function "func" [(i64, "a")] i32 $ \[a] -> do
+          function "func" [(i64, "a")] i32 [] $ \[a] -> do
             b <- trunc a i32
             ret b
     checkIR ir [text|
@@ -288,7 +288,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'zext' instruction" $ do
     let ir = do
-          function "func" [(i32, "a")] i64 $ \[a] -> do
+          function "func" [(i32, "a")] i64 [] $ \[a] -> do
             b <- zext a i64
             ret b
     checkIR ir [text|
@@ -301,7 +301,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'ptrtoint' instruction" $ do
     let ir = do
-          function "func" [(ptr i32, "ptr_a")] i64 $ \[a] -> do
+          function "func" [(ptr i32, "ptr_a")] i64 [] $ \[a] -> do
             b <- ptrtoint a i64
             ret b
     checkIR ir [text|
@@ -314,7 +314,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'bitcast' instruction" $ do
     let ir = do
-          function "func" [(ptr i32, "ptr_a")] (ptr i64) $ \[a] -> do
+          function "func" [(ptr i32, "ptr_a")] (ptr i64) [] $ \[a] -> do
             b <- a `bitcast` ptr i64
             ret b
     checkIR ir [text|
@@ -340,7 +340,7 @@ spec = describe "constructing LLVM IR" $ do
           ]
     for_ scenarios $ \(cmp, cmpText) -> do
       let ir = do
-            function "func" [(i32, "a"), (i32, "b")] i1 $ \[a, b] -> do
+            function "func" [(i32, "a"), (i32, "b")] i1 [] $ \[a, b] -> do
               c <- icmp cmp a b
               ret c
       checkIR ir [text|
@@ -353,7 +353,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'alloca' instruction" $ do
     let ir = do
-          function "func" [(i32, "a")] i32 $ \[a] -> do
+          function "func" [(i32, "a")] i32 [] $ \[a] -> do
             _ <- alloca i64 Nothing 0
             _ <- alloca i1 (Just $ int32 8) 0
             _ <- alloca i1 Nothing 8
@@ -370,7 +370,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'gep' instruction on pointers" $ do
     let ir = do
-          function "func" [(ptr i64, "a"), (ptr (ptr (ptr i64)), "b")] (ptr i64) $ \[a, b] -> do
+          function "func" [(ptr i64, "a"), (ptr (ptr (ptr i64)), "b")] (ptr i64) [] $ \[a, b] -> do
             c <- gep a [int32 1]
             _ <- gep b [int32 1, int32 2, int32 3]
             ret c
@@ -388,7 +388,7 @@ spec = describe "constructing LLVM IR" $ do
           struct1 <- typedef "my_struct" Off [i32, i64]
           struct2 <- typedef "my_struct2" Off [struct1, i1]
 
-          function "func" [(ptr struct2, "a")] (ptr i64) $ \[a] -> do
+          function "func" [(ptr struct2, "a")] (ptr i64) [] $ \[a] -> do
             c <- gep a [int32 0, int32 0, int32 1]
             _ <- gep a [int32 0, int32 1]
             ret c
@@ -409,7 +409,7 @@ spec = describe "constructing LLVM IR" $ do
     let ir = do
           let array = ArrayType 10 i32
 
-          function "func" [(ptr array, "a")] (ptr i32) $ \[a] -> do
+          function "func" [(ptr array, "a")] (ptr i32) [] $ \[a] -> do
             c <- gep a [int32 0, int32 5]
             ret c
     checkIR ir [text|
@@ -422,7 +422,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'load' instruction" $ do
     let ir = do
-          function "func" [(ptr i64, "a")] i64 $ \[a] -> do
+          function "func" [(ptr i64, "a")] i64 [] $ \[a] -> do
             b <- load a 0
             _ <- load a 8
             ret b
@@ -437,7 +437,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'store' instruction" $ do
     let ir = do
-          function "func" [(ptr i64, "a")] void $ \[a] -> do
+          function "func" [(ptr i64, "a")] void [] $ \[a] -> do
             store a 0 (int64 10)
             store a 8 (int64 10)
             retVoid
@@ -452,7 +452,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'phi' instruction" $ do
     let ir = do
-          function "func" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> mdo
+          function "func" [(i32, "a"), (i32, "b")] i32 [] $ \[a, b] -> mdo
             c <- icmp EQ a b
             condBr c block1 block2
 
@@ -482,7 +482,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'call' instruction" $ do
     let ir = mdo
-          func <- function "func" [(i32, "a")] (i32) $ \[a] -> do
+          func <- function "func" [(i32, "a")] i32 [] $ \[a] -> do
             ret =<< call func [a]
 
           pure ()
@@ -496,7 +496,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'ret' instruction" $ do
     let ir = do
-          function "func" [(i1, "a")] i1 $ \[a] -> do
+          function "func" [(i1, "a")] i1 [] $ \[a] -> do
             ret a
     checkIR ir [text|
       define external ccc i1 @func(i1 %a_0) {
@@ -507,7 +507,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'retVoid' instruction" $ do
     let ir = do
-          function "func" [] void $ \[] -> do
+          function "func" [] void [] $ \[] -> do
             retVoid
     checkIR ir [text|
       define external ccc void @func() {
@@ -518,7 +518,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "only uses first terminator instruction" $ do
     let ir = do
-          function "func" [] i1 $ \[] -> do
+          function "func" [] i1 [] $ \[] -> do
             ret (bit 0)
             ret (bit 1)
     checkIR ir [text|
@@ -530,7 +530,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "doesn't emit a block if it has no instructions or terminator" $ do
     let ir = do
-          function "func" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> mdo
+          function "func" [(i32, "a"), (i32, "b")] i32 [] $ \[a, b] -> mdo
             isZero <- eq a (int32 0)
             if' isZero $ do
               _ <- add a b
@@ -556,7 +556,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'br' instruction" $ do
     let ir = do
-          function "func" [(i1, "a")] i1 $ \[a] -> mdo
+          function "func" [(i1, "a")] i1 [] $ \[a] -> mdo
             br block2
 
             block1 <- block
@@ -577,7 +577,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'condBr' instruction" $ do
     let ir = do
-          function "func" [(i1, "a")] i1 $ \[a] -> mdo
+          function "func" [(i1, "a")] i1 [] $ \[a] -> mdo
             condBr a block1 block2
 
             block1 <- block
@@ -603,7 +603,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'switch' instruction" $ do
     let ir = do
-          function "func" [(i1, "a")] i1 $ \[a] -> mdo
+          function "func" [(i1, "a")] i1 [] $ \[a] -> mdo
             switch a defaultBlock [(bit 1, block1), (bit 0, block2)]
             block1 <- block
             ret a
@@ -627,7 +627,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'select' instruction" $ do
     let ir = do
-          function "not" [(i1, "a")] i1 $ \[a] -> do
+          function "not" [(i1, "a")] i1 [] $ \[a] -> do
             b <- select a (bit 0) (bit 1)
             ret b
     checkIR ir [text|
@@ -640,7 +640,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'bit' for creating i1 values" $ do
     let ir = do
-          function "func" [] i1 $ \[] -> do
+          function "func" [] i1 [] $ \[] -> do
             ret (bit 1)
     checkIR ir [text|
       define external ccc i1 @func() {
@@ -649,7 +649,7 @@ spec = describe "constructing LLVM IR" $ do
       }
       |]
     let ir2 = do
-          function "func" [] i1 $ \[] -> do
+          function "func" [] i1 [] $ \[] -> do
             ret (bit 0)
     checkIR ir2 [text|
       define external ccc i1 @func() {
@@ -660,7 +660,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'int8' for creating i8 values" $ do
     let ir = do
-          function "func" [] i8 $ \[] -> do
+          function "func" [] i8 [] $ \[] -> do
             ret (int8 15)
     checkIR ir [text|
       define external ccc i8 @func() {
@@ -671,7 +671,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'int16' for creating i16 values" $ do
     let ir = do
-          function "func" [] i16 $ \[] -> do
+          function "func" [] i16 [] $ \[] -> do
             ret (int16 30)
     checkIR ir [text|
       define external ccc i16 @func() {
@@ -682,7 +682,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'int32' for creating i32 values" $ do
     let ir = do
-          function "func" [] i32 $ \[] -> do
+          function "func" [] i32 [] $ \[] -> do
             ret (int32 60)
     checkIR ir [text|
       define external ccc i32 @func() {
@@ -693,7 +693,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'int64' for creating i64 values" $ do
     let ir = do
-          function "func" [] i64 $ \[] -> do
+          function "func" [] i64 [] $ \[] -> do
             ret (int64 120)
     checkIR ir [text|
       define external ccc i64 @func() {
@@ -704,7 +704,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'intN' for creating iN values" $ do
     let ir = do
-          function "func" [] (IntType 42) $ \[] -> do
+          function "func" [] (IntType 42) [] $ \[] -> do
             ret (intN 42 1000)
     checkIR ir [text|
       define external ccc i42 @func() {
@@ -715,7 +715,7 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'nullPtr' for creating null values" $ do
     let ir = do
-          function "func" [] (ptr i8) $ \[] -> do
+          function "func" [] (ptr i8) [] $ \[] -> do
             ret $ nullPtr i8
     checkIR ir [text|
       define external ccc i8* @func() {

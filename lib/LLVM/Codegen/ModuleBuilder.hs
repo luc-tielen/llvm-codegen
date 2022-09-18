@@ -39,7 +39,9 @@ import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Codegen.Flag
 import LLVM.Codegen.NameSupply
+import LLVM.Codegen.FunctionAttributes
 import LLVM.Pretty
+import Data.Foldable
 
 newtype Module
   = Module [Definition]
@@ -58,7 +60,7 @@ instance IsString ParameterName where
 
 data Global
   = GlobalVariable Name Type Constant
-  | Function Name Type [(Type, ParameterName)] [BasicBlock]
+  | Function Name Type [(Type, ParameterName)] [FunctionAttribute] [BasicBlock]
   deriving Show
 
 data Definition
@@ -77,14 +79,17 @@ instance Pretty Global where
   pretty = \case
     GlobalVariable name ty constant ->
       "@" <> pretty name <+> "=" <+> "global" <+> pretty ty <+> pretty constant
-    Function name retTy args body
+    Function name retTy args attributes body
       | null body ->
         "declare external ccc" <+> pretty retTy <+> fnName <> toTuple (map (pretty . fst) args)
       | otherwise ->
-        "define external ccc" <+> pretty retTy <+> fnName <> toTuple (zipWith prettyArg [0..] args) <+>
-          "{" <> hardline <>
-          prettyBody body <> hardline <>
-          "}"
+        "define external ccc"
+          <+> pretty retTy
+          <+> fnName <> toTuple (zipWith prettyArg [0..] args)
+          <> fold ((" " <>) . pretty <$> attributes)
+          <+> "{" <> hardline <>
+              prettyBody body <> hardline <>
+              "}"
       where
         fnName = "@" <> pretty name
         prettyArg :: Int -> (Type, ParameterName) -> Doc ann
@@ -167,14 +172,14 @@ runModuleBuilderT (ModuleBuilderT m) =
 runModuleBuilder :: ModuleBuilder a -> Module
 runModuleBuilder = runIdentity . runModuleBuilderT
 
-function :: MonadModuleBuilder m => Name -> [(Type, ParameterName)] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
-function name args retTy fnBody = do
+function :: MonadModuleBuilder m => Name -> [(Type, ParameterName)] -> Type -> [FunctionAttribute] -> ([Operand] -> IRBuilderT m a) -> m Operand
+function name args retTy attributes fnBody = do
   (names, instrs) <- runIRBuilderT $ do
     (names, operands) <- unzip <$> traverse (uncurry mkOperand) args
     _ <- fnBody operands
     pure names
   let args' = zipWith (\argName (ty, _) -> (ty, ParameterName $ unName argName)) names args
-  emitDefinition $ GlobalDefinition $ Function name retTy args' instrs
+  emitDefinition $ GlobalDefinition $ Function name retTy args' attributes instrs
   pure $ ConstantOperand $ GlobalRef (ptr (FunctionType retTy $ map fst args)) name
 
 emitDefinition :: MonadModuleBuilder m => Definition -> m ()
@@ -213,7 +218,7 @@ typedef name packed tys = do
 extern :: MonadModuleBuilder m => Name -> [Type] -> Type -> m Operand
 extern name argTys retTy = do
   let args = [(argTy, ParameterName "") | argTy <- argTys]
-  emitDefinition $ GlobalDefinition $ Function name retTy args []
+  emitDefinition $ GlobalDefinition $ Function name retTy args [] []
   let fnTy = ptr $ FunctionType retTy argTys
   pure $ ConstantOperand $ GlobalRef fnTy name
 

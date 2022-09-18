@@ -37,6 +37,7 @@ library
       LLVM.Codegen.NameSupply
       LLVM.Codegen.Operand
       LLVM.Codegen.Type
+      LLVM.Codegen.FunctionAttributes
       LLVM.Pretty
   other-modules:
       Paths_llvm_codegen

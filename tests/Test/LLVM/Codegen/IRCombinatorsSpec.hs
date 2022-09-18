@@ -25,7 +25,7 @@ spec = describe "IR builder combinators" $ parallel $ do
                     ]
     for_ scenarios $ \(f, op) -> do
       let ir = do
-            function "func" [(i32, "a"), (i32, "b")] i1 $ \[a, b] -> do
+            function "func" [(i32, "a"), (i32, "b")] i1 [] $ \[a, b] -> do
               c <- f a b
               ret c
       checkIR ir [text|
@@ -38,7 +38,7 @@ spec = describe "IR builder combinators" $ parallel $ do
 
   it "supports 'one-sided if' combinator" $ do
     let ir = do
-          function "func" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> mdo
+          function "func" [(i32, "a"), (i32, "b")] i32 [] $ \[a, b] -> mdo
             isZero <- eq a (int32 0)
             if' isZero $ do
               _ <- add a b
@@ -60,7 +60,7 @@ spec = describe "IR builder combinators" $ parallel $ do
 
   it "supports 'loop' combinator" $ do
     let ir = do
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             i <- allocate i32 (int32 0)
 
             loop $ do
@@ -92,7 +92,7 @@ spec = describe "IR builder combinators" $ parallel $ do
 
   it "supports 'loopWhile combinator" $ do
     let ir = do
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             i <- allocate i32 (int32 10)
             let notZero = do
                   iVal <- load i 0
@@ -125,7 +125,7 @@ spec = describe "IR builder combinators" $ parallel $ do
 
   it "supports 'loopFor' combinator" $ do
     let ir = do
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             x <- allocate i32 (int32 10)
 
             loopFor (int32 0) (`ult` int32 10) (add (int32 1)) $ \i -> do
@@ -157,7 +157,7 @@ spec = describe "IR builder combinators" $ parallel $ do
 
   it "supports 'pointer subtraction' combinator" $ do
     let ir = do
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             array <- alloca i32 (Just $ int32 5) 0
             ptr1 <- gep array [int32 0]
             ptr2 <- gep array [int32 3]
@@ -179,7 +179,7 @@ spec = describe "IR builder combinators" $ parallel $ do
 
   it "supports logical not" $ do
     let ir = do
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             _ <- not' $ bit 0
             ret $ int32 42
     checkIR ir [text|
@@ -192,7 +192,7 @@ spec = describe "IR builder combinators" $ parallel $ do
 
   it "supports computing the minimum of 2 values" $ do
     let ir = do
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             _result1 <- minimum' Signed (int32 100) (int32 42)
             _result2 <- minimum' Unsigned (int32 100) (int32 42)
             ret $ int32 42
@@ -209,7 +209,7 @@ spec = describe "IR builder combinators" $ parallel $ do
 
   it "supports allocating and initializing a variable on the stack" $ do
     let ir = do
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             _i <- allocate i32 (int32 0)
             ret $ int32 42
     checkIR ir [text|
@@ -228,7 +228,7 @@ spec = describe "IR builder combinators" $ parallel $ do
   it "supports computing the address based on a Path" $ do
     let path = Path [int32 5]
         ir = do
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             array <- alloca i32 (Just $ int32 5) 0
             _address <- addr path array
             ret $ int32 42
@@ -244,7 +244,7 @@ spec = describe "IR builder combinators" $ parallel $ do
   it "supports dereferencing an address based on a Path" $ do
     let path = Path [int32 5]
         ir = mdo
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             array <- alloca i32 (Just $ int32 5) 0
             _value <- deref path array
             ret $ int32 42
@@ -261,7 +261,7 @@ spec = describe "IR builder combinators" $ parallel $ do
   it "supports storing a value at an address based on a Path" $ do
     let path = Path [int32 5]
         ir = mdo
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             array <- alloca i32 (Just $ int32 5) 0
             assign path array (int32 1000)
             ret $ int32 42
@@ -278,7 +278,7 @@ spec = describe "IR builder combinators" $ parallel $ do
   it "supports updating a value at an address based on a Path" $ do
     let path = Path [int32 5]
         ir = mdo
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             array <- alloca i32 (Just $ int32 5) 0
             assign path array (int32 1000)
             update path array (add (int32 10))
@@ -300,7 +300,7 @@ spec = describe "IR builder combinators" $ parallel $ do
   it "supports incrementing a value at an address based on a Path" $ do
     let path = Path [int32 5]
         ir = mdo
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             array <- alloca i32 (Just $ int32 5) 0
             assign path array (int32 1000)
             increment int32 path array
@@ -322,7 +322,7 @@ spec = describe "IR builder combinators" $ parallel $ do
   it "supports copying (part of) a type based on a Path" $ do
     let path = Path [int32 5]
         ir = mdo
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             array <- alloca i32 (Just $ int32 5) 0
             assign path array (int32 1000)
             array2 <- alloca i32 (Just $ int32 5) 0
@@ -346,7 +346,7 @@ spec = describe "IR builder combinators" $ parallel $ do
   it "supports swapping (part of) a type based on a Path" $ do
     let path = Path [int32 5]
         ir = mdo
-          function "func" [] i32 $ \_ -> mdo
+          function "func" [] i32 [] $ \_ -> mdo
             array <- alloca i32 (Just $ int32 5) 0
             assign path array (int32 1000)
             array2 <- alloca i32 (Just $ int32 5) 0
