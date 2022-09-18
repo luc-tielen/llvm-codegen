@@ -48,7 +48,9 @@ spec = describe "constructing LLVM IR" $ do
           _ <- typedef "void_type" void
           myType <- typedef "my_type" $ ArrayType 10 i16
           _ <- typedef "my_type2" $ StructureType Off [myType, myType]
-          typedef "my_type2_packed" $ StructureType On [myType, myType]
+          _ <- typedef "my_type2_packed" $ StructureType On [myType, myType]
+          _ <- opaqueTypedef "my_opaque_type"
+          pure ()
     checkIR ir [text|
       %i1_synonym = type i1
 
@@ -65,6 +67,8 @@ spec = describe "constructing LLVM IR" $ do
       %my_type2 = type {%my_type, %my_type}
 
       %my_type2_packed = type <{%my_type, %my_type}>
+
+      %my_opaque_type = type opaque
       |]
 
   it "supports external definitions" $ do

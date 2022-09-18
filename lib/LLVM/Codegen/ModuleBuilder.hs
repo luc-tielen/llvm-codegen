@@ -13,6 +13,7 @@ module LLVM.Codegen.ModuleBuilder
   , global
   , extern
   , typedef
+  , opaqueTypedef
   , getTypedefs
   , lookupType
   ) where
@@ -60,17 +61,25 @@ data Global
   | Function Name Type [(Type, ParameterName)] [BasicBlock]
   deriving Show
 
+data Typedef
+  = Opaque
+  | Clear Type
+  deriving Show
+
 data Definition
   = GlobalDefinition Global
-  | TypeDefinition Name Type
+  | TypeDefinition Name Typedef
   deriving Show
 
 instance Pretty Definition where
  pretty = \case
    GlobalDefinition g ->
      pretty g
-   TypeDefinition name ty ->
-     "%" <> pretty name <+> "=" <+> "type" <+> pretty ty
+   TypeDefinition name typeDef ->
+     let prettyTy = case typeDef of
+          Opaque -> "opaque"
+          Clear ty -> pretty ty
+      in "%" <> pretty name <+> "=" <+> "type" <+> prettyTy
 
 instance Pretty Global where
   pretty = \case
@@ -195,8 +204,13 @@ global name ty constant = do
 
 typedef :: MonadModuleBuilder m => Name -> Type -> m Type
 typedef name ty = do
-  emitDefinition $ TypeDefinition name ty
+  emitDefinition $ TypeDefinition name (Clear ty)
   addType name ty
+  pure $ NamedTypeReference name
+
+opaqueTypedef :: MonadModuleBuilder m => Name -> m Type
+opaqueTypedef name = do
+  emitDefinition $ TypeDefinition name Opaque
   pure $ NamedTypeReference name
 
 extern :: MonadModuleBuilder m => Name -> [Type] -> Type -> m Operand
