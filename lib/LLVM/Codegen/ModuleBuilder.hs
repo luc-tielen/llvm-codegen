@@ -38,6 +38,7 @@ import Data.Functor.Identity
 import LLVM.Codegen.IRBuilder.Monad
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
+import LLVM.Codegen.Flag
 import LLVM.Codegen.NameSupply
 import LLVM.Pretty
 
@@ -87,9 +88,9 @@ instance Pretty Global where
       "@" <> pretty name <+> "=" <+> "global" <+> pretty ty <+> pretty constant
     Function name retTy args body
       | null body ->
-        "declare external ccc" <+> pretty retTy <+> fnName <> tupled (map (pretty . fst) args)
+        "declare external ccc" <+> pretty retTy <+> fnName <> toTuple (map (pretty . fst) args)
       | otherwise ->
-        "define external ccc" <+> pretty retTy <+> fnName <> tupled (zipWith prettyArg [0..] args) <+>
+        "define external ccc" <+> pretty retTy <+> fnName <> toTuple (zipWith prettyArg [0..] args) <+>
           "{" <> hardline <>
           prettyBody body <> hardline <>
           "}"
@@ -103,6 +104,10 @@ instance Pretty Global where
             ParameterName paramName ->
               pretty argTy <+> pretty (LocalRef argTy $ Name paramName)
         prettyBody blocks = vsep $ map pretty blocks
+        toTuple argDocs =
+          parens $ argDocs `sepBy` ", "
+        sepBy docs separator =
+          mconcat $ L.intersperse separator docs
 
 data ModuleBuilderState
   = ModuleBuilderState
@@ -202,8 +207,12 @@ global name ty constant = do
   emitDefinition $ GlobalDefinition $ GlobalVariable name ty constant
   pure $ ConstantOperand $ GlobalRef (ptr ty) name
 
-typedef :: MonadModuleBuilder m => Name -> Type -> m Type
-typedef name ty = do
+-- NOTE: typedefs are only allowed for structs, even though clang also allows it
+-- for primitive types. This is done to avoid weird inconsistencies with the LLVM JIT
+-- (where this is not allowed).
+typedef :: MonadModuleBuilder m => Name -> Flag Packed -> [Type] -> m Type
+typedef name packed tys = do
+  let ty = StructureType packed tys
   emitDefinition $ TypeDefinition name (Clear ty)
   addType name ty
   pure $ NamedTypeReference name
@@ -219,8 +228,6 @@ extern name argTys retTy = do
   emitDefinition $ GlobalDefinition $ Function name retTy args []
   let fnTy = ptr $ FunctionType retTy argTys
   pure $ ConstantOperand $ GlobalRef fnTy name
-
--- TODO add extra variant for opaque (no type provided) typedef (if needed)
 
 -- NOTE: Only used internally, this creates an unassigned operand
 mkOperand :: Monad m => Type -> ParameterName -> IRBuilderT m (Name, Operand)

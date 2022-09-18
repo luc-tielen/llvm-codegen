@@ -207,7 +207,7 @@ instance MonadIRBuilder m => MonadIRBuilder (ExceptT e m)
 
 instance Pretty BasicBlock where
   pretty (BB (Name name) stmts (Terminator term)) =
-    let prettyStmts = indent 2 $ vsep $ (map (uncurry prettyStmt) $ DList.apply stmts []) ++ [pretty term]
+    let prettyStmts = indent 2 $ vsep $ map (uncurry prettyStmt) (DList.apply stmts []) ++ [pretty term]
      in vsep [ pretty name <> ":", prettyStmts ]
     where
       prettyStmt operand instr =

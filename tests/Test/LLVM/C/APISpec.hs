@@ -22,7 +22,7 @@ mkType ctx = \case
     C.mkPointerType =<< mkType ctx ty
   StructureType packed tys -> do
     tys' <- traverse (mkType ctx) tys
-    C.mkStructType ctx tys' packed
+    C.mkAnonStructType ctx tys' packed
   ArrayType count ty -> do
     ty' <- mkType ctx ty
     C.mkArrayType ty' count
@@ -107,5 +107,4 @@ spec = describe "LLVM C API" $ parallel $ do
     ty' <- mkType ctx ty
     ty' `shouldBe` nullPtr
 
-  -- TODO test for known named type ref,
-  -- but need to implement LLVMStructCreateNamed + LLVMStructSetBody first to add to module
+  -- TODO test for known named type ref, but need to first add to module

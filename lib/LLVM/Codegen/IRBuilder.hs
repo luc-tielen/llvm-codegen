@@ -195,7 +195,11 @@ call fn args = case typeOf fn of
   _ -> error "Malformed AST, expected function type in 'call' instruction"
   where
     emitCallInstr resultTy =
-      emitInstr resultTy $ Call Nothing C fn args
+      if resultTy == VoidType
+        then do
+          emitInstrVoid $ Call Nothing C fn args
+          pure $ ConstantOperand $ Undef void  -- Invalid, but isn't rendered anyway
+        else emitInstr resultTy $ Call Nothing C fn args
 
 ret :: MonadIRBuilder m => Operand -> m ()
 ret val =

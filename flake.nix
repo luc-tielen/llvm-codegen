@@ -23,7 +23,7 @@
                 overrides = hf: hp: {
                   llvm-codegen =
                     (hf.callCabal2nix "llvm-codegen" ./. {
-                      llvm-config = final.llvmPackages_13.llvm;
+                      llvm-config = final.llvmPackages_14.llvm;
                     });
                 };
               };
@@ -42,7 +42,7 @@
           imports = [];
           packages = with pkgs;
             with haskellPackages; [
-              pkgs.llvmPackages_13.llvm.dev
+              pkgs.llvmPackages_14.llvm.dev
               pkgs.ghcid
               (ghcWithPackages (p:
                 with p; [

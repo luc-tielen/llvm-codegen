@@ -40,33 +40,19 @@ spec = describe "constructing LLVM IR" $ do
       |]
 
   it "supports type definitions" $ do
-    let ir = do
-          _ <- typedef "i1_synonym" i1
-          _ <- typedef "i32_synonym" i32
-          _ <- typedef "pointer_to_i32" (ptr i32)
-          _ <- typedef "ptr_to_ptr" (ptr (ptr i32))
-          _ <- typedef "void_type" void
-          myType <- typedef "my_type" $ ArrayType 10 i16
-          _ <- typedef "my_type2" $ StructureType Off [myType, myType]
-          _ <- typedef "my_type2_packed" $ StructureType On [myType, myType]
+    let ir = mdo
+          let myType = ArrayType 10 i16
+          _ <- typedef "my_type2" Off [myType, myType]
+          _ <- typedef "my_type2_packed" On [myType, myType]
+          s <- typedef "recursive" Off [ptr s]
           _ <- opaqueTypedef "my_opaque_type"
           pure ()
     checkIR ir [text|
-      %i1_synonym = type i1
+      %my_type2 = type {[10 x i16], [10 x i16]}
 
-      %i32_synonym = type i32
+      %my_type2_packed = type <{[10 x i16], [10 x i16]}>
 
-      %pointer_to_i32 = type i32*
-
-      %ptr_to_ptr = type i32**
-
-      %void_type = type void
-
-      %my_type = type [10 x i16]
-
-      %my_type2 = type {%my_type, %my_type}
-
-      %my_type2_packed = type <{%my_type, %my_type}>
+      %recursive = type {%recursive*}
 
       %my_opaque_type = type opaque
       |]
@@ -401,8 +387,8 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'gep' instruction on structs" $ do
     let ir = do
-          struct1 <- typedef "my_struct" (StructureType Off [i32, i64])
-          struct2 <- typedef "my_struct2" (StructureType Off [struct1, i1])
+          struct1 <- typedef "my_struct" Off [i32, i64]
+          struct2 <- typedef "my_struct2" Off [struct1, i1]
 
           function "func" [(ptr struct2, "a")] (ptr i64) $ \[a] -> do
             c <- gep a [int32 0, int32 0, int32 1]
@@ -423,17 +409,15 @@ spec = describe "constructing LLVM IR" $ do
 
   it "supports 'gep' instruction on arrays" $ do
     let ir = do
-          array <- typedef "my_struct" (ArrayType 10 i32)
+          let array = ArrayType 10 i32
 
           function "func" [(ptr array, "a")] (ptr i32) $ \[a] -> do
             c <- gep a [int32 0, int32 5]
             ret c
     checkIR ir [text|
-      %my_struct = type [10 x i32]
-
-      define external ccc i32* @func(%my_struct* %a_0) {
+      define external ccc i32* @func([10 x i32]* %a_0) {
       start:
-        %0 = getelementptr %my_struct, %my_struct* %a_0, i32 0, i32 5
+        %0 = getelementptr [10 x i32], [10 x i32]* %a_0, i32 0, i32 5
         ret i32* %0
       }
       |]
@@ -632,7 +616,7 @@ spec = describe "constructing LLVM IR" $ do
     checkIR ir [text|
       define external ccc i1 @func(i1 %a_0) {
       start:
-        switch i1 %a_0, block_2 [i1 1, label block_0, i1 0, label block_1]
+        switch i1 %a_0, label %block_2 [i1 1, label %block_0 i1 0, label %block_1]
       block_0:
         ret i1 %a_0
       block_1:
