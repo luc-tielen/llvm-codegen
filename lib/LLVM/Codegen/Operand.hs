@@ -12,6 +12,7 @@ import Data.Word
 
 data Constant
   = GlobalRef Type Name
+  | Array Type [Constant]
   | Int Word32 Integer
   | NullPtr Type
   | Undef Type
@@ -32,6 +33,8 @@ typeOf = \case
     typeOfConstant = \case
       GlobalRef ty _ ->
         ty
+      Array ty cs ->
+        ArrayType (fromIntegral $ length cs) ty
       Int bits _ ->
         IntType bits
       NullPtr ty ->
@@ -50,6 +53,8 @@ instance Pretty Constant where
   pretty = \case
     GlobalRef _ name ->
       "@" <> pretty name
+    Array ty cs ->
+      brackets $ commas (map (\c -> pretty ty <+> pretty c) cs)
     Int _bits x ->
       pretty x
     NullPtr _ ->

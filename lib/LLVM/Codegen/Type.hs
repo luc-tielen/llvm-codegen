@@ -54,8 +54,8 @@ instance Pretty Type where
       "void"
     StructureType packed elemTys
       | packed == On ->
-        "<{" <> (commas $ map pretty elemTys ) <> "}>"
+        "<{" <> commas (map pretty elemTys) <> "}>"
       | otherwise ->
-        "{" <> (commas $ map pretty elemTys ) <> "}"
+        "{" <> commas (map pretty elemTys) <> "}"
     ArrayType count ty ->
       brackets $ pretty count <+> "x" <+> pretty ty

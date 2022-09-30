@@ -14,6 +14,7 @@ extra-source-files:
 dependencies:
   - base >= 4.7 && < 5
   - text == 1.*
+  - bytestring == 0.10.*
   - containers == 0.*
   - mtl == 2.*
   - dlist == 1.*

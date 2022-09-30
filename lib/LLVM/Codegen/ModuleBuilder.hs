@@ -11,8 +11,10 @@ module LLVM.Codegen.ModuleBuilder
   , ParameterName(..)
   , function
   , global
+  , globalUtf8StringPtr
   , extern
   , typedef
+  , opaqueTypedef
   , getTypedefs
   , lookupType
   ) where
@@ -32,6 +34,8 @@ import Data.String
 import qualified Data.DList as DList
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
+import qualified Data.ByteString as BS
 import qualified Data.List as L
 import Data.Functor.Identity
 import LLVM.Codegen.IRBuilder.Monad
@@ -39,6 +43,7 @@ import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Codegen.Flag
 import LLVM.Codegen.NameSupply
+import LLVM.Codegen.IR
 import LLVM.Pretty
 
 newtype Module
@@ -61,17 +66,25 @@ data Global
   | Function Name Type [(Type, ParameterName)] [BasicBlock]
   deriving Show
 
+data Typedef
+  = Opaque
+  | Clear Type
+  deriving Show
+
 data Definition
   = GlobalDefinition Global
-  | TypeDefinition Name Type
+  | TypeDefinition Name Typedef
   deriving Show
 
 instance Pretty Definition where
  pretty = \case
    GlobalDefinition g ->
      pretty g
-   TypeDefinition name ty ->
-     "%" <> pretty name <+> "=" <+> "type" <+> pretty ty
+   TypeDefinition name typeDef ->
+     let prettyTy = case typeDef of
+          Opaque -> "opaque"
+          Clear ty -> pretty ty
+      in "%" <> pretty name <+> "=" <+> "type" <+> prettyTy
 
 instance Pretty Global where
   pretty = \case
@@ -198,17 +211,34 @@ global name ty constant = do
   emitDefinition $ GlobalDefinition $ GlobalVariable name ty constant
   pure $ ConstantOperand $ GlobalRef (ptr ty) name
 
+globalUtf8StringPtr :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m) => T.Text -> Name -> m Operand
+globalUtf8StringPtr txt name = do
+  let utf8Bytes = BS.snoc (TE.encodeUtf8 txt) 0  -- 0-terminated UTF8 string
+      llvmValues = map (Int 8 . toInteger) $ BS.unpack utf8Bytes
+      arrayValue = Array i8 llvmValues
+      constant = ConstantOperand arrayValue
+      ty = typeOf constant
+  -- This definition will end up before the function this is used in
+  addr <- global name ty arrayValue
+  let instr = GetElementPtr On addr [ ConstantOperand $ Int 32 0
+                                    , ConstantOperand $ Int 32 0
+                                    ]
+  emitInstr (ptr i8) instr
+
 -- NOTE: typedefs are only allowed for structs, even though clang also allows it
 -- for primitive types. This is done to avoid weird inconsistencies with the LLVM JIT
 -- (where this is not allowed).
 typedef :: MonadModuleBuilder m => Name -> Flag Packed -> [Type] -> m Type
 typedef name packed tys = do
   let ty = StructureType packed tys
-  emitDefinition $ TypeDefinition name ty
+  emitDefinition $ TypeDefinition name (Clear ty)
   addType name ty
   pure $ NamedTypeReference name
 
--- TODO add extra variant for opaque (no type provided) typedef (if needed)
+opaqueTypedef :: MonadModuleBuilder m => Name -> m Type
+opaqueTypedef name = do
+  emitDefinition $ TypeDefinition name Opaque
+  pure $ NamedTypeReference name
 
 extern :: MonadModuleBuilder m => Name -> [Type] -> Type -> m Operand
 extern name argTys retTy = do
