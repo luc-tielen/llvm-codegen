@@ -19,6 +19,7 @@ module LLVM.Codegen.ModuleBuilder
   , lookupType
   ) where
 
+import GHC.Stack
 import Control.Monad.State.Lazy (StateT(..), MonadState, State, execStateT, modify, gets)
 import qualified Control.Monad.State.Strict as StrictState
 import qualified Control.Monad.State.Lazy as LazyState
@@ -180,7 +181,7 @@ runModuleBuilderT (ModuleBuilderT m) =
 runModuleBuilder :: ModuleBuilder a -> Module
 runModuleBuilder = runIdentity . runModuleBuilderT
 
-function :: MonadModuleBuilder m => Name -> [(Type, ParameterName)] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
+function :: (HasCallStack, MonadModuleBuilder m) => Name -> [(Type, ParameterName)] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
 function name args retTy fnBody = do
   (names, instrs) <- runIRBuilderT $ do
     (names, operands) <- unzip <$> traverse (uncurry mkOperand) args
@@ -211,7 +212,8 @@ global name ty constant = do
   emitDefinition $ GlobalDefinition $ GlobalVariable name ty constant
   pure $ ConstantOperand $ GlobalRef (ptr ty) name
 
-globalUtf8StringPtr :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m) => T.Text -> Name -> m Operand
+globalUtf8StringPtr :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+                    => T.Text -> Name -> m Operand
 globalUtf8StringPtr txt name = do
   let utf8Bytes = BS.snoc (TE.encodeUtf8 txt) 0  -- 0-terminated UTF8 string
       llvmValues = map (Int 8 . toInteger) $ BS.unpack utf8Bytes
