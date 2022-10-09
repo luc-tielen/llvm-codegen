@@ -12,7 +12,7 @@
     eachSystem [ "x86_64-linux" ] (system:
       let
         ghcVersion = "902";
-        llvmVersion = 13;
+        llvmVersion = 14;
         version = "${ghcVersion}.${substring 0 8 self.lastModifiedDate}.${
             self.shortRev or "dirty"
           }";
