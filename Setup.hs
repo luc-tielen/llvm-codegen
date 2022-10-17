@@ -171,16 +171,19 @@ main = do
 #else
           newHsc buildInfo localBuildInfo =
 #endif
-              PreProcessor {
-                  platformIndependent = platformIndependent (origHsc buildInfo),
-                  runPreProcessor = \inFiles outFiles verbosity -> do
+              PreProcessor
+                { platformIndependent = platformIndependent (origHsc buildInfo)
+                , runPreProcessor = \inFiles outFiles verbosity -> do
                       llvmConfig <- getLLVMConfig (configFlags localBuildInfo)
                       llvmCFlags <- do
                           rawLlvmCFlags <- llvmConfig ["--cflags"]
                           return . filter (not . isIgnoredCFlag) $ words rawLlvmCFlags
                       let buildInfo' = buildInfo { ccOptions = "-Wno-variadic-macros" : llvmCFlags }
                       runPreProcessor (origHsc buildInfo') inFiles outFiles verbosity
-              }
+#ifdef MIN_VERSION_Cabal_3_8_1_0
+                , ppOrdering = \_verbosity _paths modules -> pure modules
+#endif
+                }
               where origHsc buildInfo' =
                       fromMaybe
                         ppHsc2hs
