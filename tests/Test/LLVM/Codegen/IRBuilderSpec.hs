@@ -5,6 +5,7 @@ module Test.LLVM.Codegen.IRBuilderSpec
   ) where
 
 import Prelude hiding (and, EQ)
+import qualified Data.Text as T
 import Data.Foldable hiding (and)
 import Test.Hspec
 import NeatInterpolation
@@ -742,3 +743,31 @@ spec = describe "constructing LLVM IR" $ do
         ret i8* zeroinitializer
       }
       |]
+
+  describe "function attributes" $ parallel $ do
+    let checkAttr attr attrStr =
+          it ("supports " <> T.unpack attrStr) $ do
+            let ir = withDefaultFunctionAttributes (const [attr]) $
+                       function "func" [] (IntType 42) $ \[] -> do
+                         ret (intN 42 1000)
+            checkIR ir [text|
+              define external ccc i42 @func() $attrStr {
+              start:
+                ret i42 1000
+              }
+              |]
+
+    checkAttr AlwaysInline "alwaysinline"
+    checkAttr (WasmExportName "test") "\"wasm-export-name\"=\"test\""
+
+    it "supports multiple function attributes" $ do
+      let attrs = [AlwaysInline, WasmExportName "test"]
+          ir = withDefaultFunctionAttributes (const attrs) $
+                 function "func" [] (IntType 42) $ \[] -> do
+                   ret (intN 42 1000)
+      checkIR ir [text|
+        define external ccc i42 @func() alwaysinline "wasm-export-name"="test" {
+        start:
+          ret i42 1000
+        }
+        |]
