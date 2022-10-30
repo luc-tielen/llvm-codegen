@@ -180,7 +180,9 @@ main = do
                           return . filter (not . isIgnoredCFlag) $ words rawLlvmCFlags
                       let buildInfo' = buildInfo { ccOptions = "-Wno-variadic-macros" : llvmCFlags }
                       runPreProcessor (origHsc buildInfo') inFiles outFiles verbosity
+#if MIN_VERSION_Cabal(3,8,1)
                 , ppOrdering = \_verbosity _paths modules -> pure modules
+#endif
                 }
               where origHsc buildInfo' =
                       fromMaybe
