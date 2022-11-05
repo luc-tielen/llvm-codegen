@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.34.7.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -59,7 +59,7 @@ library
       FlexibleInstances
       ScopedTypeVariables
       DefaultSignatures
-  ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits
+  ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits -optl=-lLLVM-14
   build-tools:
       llvm-config
   build-depends:
@@ -100,7 +100,7 @@ test-suite llvm-codegen-test
       FlexibleInstances
       ScopedTypeVariables
       DefaultSignatures
-  ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits
+  ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits -optl=-lLLVM-14
   build-tools:
       llvm-config
   build-depends:
