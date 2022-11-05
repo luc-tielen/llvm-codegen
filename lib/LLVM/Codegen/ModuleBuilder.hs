@@ -22,7 +22,7 @@ module LLVM.Codegen.ModuleBuilder
   ) where
 
 import GHC.Stack
-import Control.Monad.State.Lazy (StateT(..), MonadState, State, execStateT, modify, gets, get, put)
+import Control.Monad.State.Lazy (StateT(..), MonadState, State, execStateT, modify, gets)
 import qualified Control.Monad.State.Strict as StrictState
 import qualified Control.Monad.State.Lazy as LazyState
 import qualified Control.Monad.RWS.Lazy as LazyRWS
@@ -212,6 +212,11 @@ withDefaultFunctionAttributes f m = do
     modify $ \s -> s { defaultFunctionAttributes = fnAttrs }
   pure result
 
+resetFunctionAttributes :: MonadModuleBuilder m => m ()
+resetFunctionAttributes =
+  liftModuleBuilderState $
+    modify $ \s -> s { defaultFunctionAttributes = mempty }
+
 getDefaultFunctionAttributes :: MonadModuleBuilder m => m [FunctionAttribute]
 getDefaultFunctionAttributes =
   liftModuleBuilderState $ gets defaultFunctionAttributes
@@ -222,12 +227,17 @@ runModuleBuilder = runIdentity . runModuleBuilderT
 function :: (HasCallStack, MonadModuleBuilder m)
          => Name -> [(Type, ParameterName)] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
 function name args retTy fnBody = do
+  fnAttrs <- getDefaultFunctionAttributes
+
   (names, instrs) <- runIRBuilderT $ do
     (names, operands) <- unzip <$> traverse (uncurry mkOperand) args
+    resetFunctionAttributes  -- This is done to avoid functions emitted in the body that not automatically copy the same attributes
     _ <- fnBody operands
     pure names
+
+  liftModuleBuilderState $
+    modify $ \s -> s { defaultFunctionAttributes = fnAttrs }
   let args' = zipWith (\argName (ty, _) -> (ty, ParameterName $ unName argName)) names args
-  fnAttrs <- getDefaultFunctionAttributes
   emitDefinition $ GlobalDefinition $ Function name retTy args' fnAttrs instrs
   pure $ ConstantOperand $ GlobalRef (ptr (FunctionType retTy $ map fst args)) name
 
