@@ -18,7 +18,7 @@ module LLVM.Codegen.ModuleBuilder
   , opaqueTypedef
   , getTypedefs
   , lookupType
-  , withDefaultFunctionAttributes
+  , withFunctionAttributes
   ) where
 
 import GHC.Stack
@@ -199,11 +199,11 @@ runModuleBuilderT (ModuleBuilderT m) =
   where
     beginState = ModuleBuilderState mempty mempty []
 
-withDefaultFunctionAttributes
+withFunctionAttributes
   :: MonadModuleBuilder m
   => ([FunctionAttribute] -> [FunctionAttribute])
   -> m a -> m a
-withDefaultFunctionAttributes f m = do
+withFunctionAttributes f m = do
   fnAttrs <- liftModuleBuilderState (gets defaultFunctionAttributes)
   liftModuleBuilderState $
     modify $ \s -> s { defaultFunctionAttributes = f fnAttrs }

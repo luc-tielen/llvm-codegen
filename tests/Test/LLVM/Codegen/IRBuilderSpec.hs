@@ -747,7 +747,7 @@ spec = describe "constructing LLVM IR" $ do
   describe "function attributes" $ parallel $ do
     let checkAttr attr attrStr =
           it ("supports " <> T.unpack attrStr) $ do
-            let ir = withDefaultFunctionAttributes (const [attr]) $
+            let ir = withFunctionAttributes (const [attr]) $
                        function "func" [] (IntType 42) $ \[] -> do
                          ret (intN 42 1000)
             checkIR ir [text|
@@ -762,7 +762,7 @@ spec = describe "constructing LLVM IR" $ do
 
     it "supports multiple function attributes" $ do
       let attrs = [AlwaysInline, WasmExportName "test"]
-          ir = withDefaultFunctionAttributes (const attrs) $
+          ir = withFunctionAttributes (const attrs) $
                  function "func" [] (IntType 42) $ \[] -> do
                    ret (intN 42 1000)
       checkIR ir [text|
