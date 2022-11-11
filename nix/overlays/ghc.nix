@@ -1,3 +1,4 @@
+# stolen from and slightly adapted from here: https://github.com/hasura/graphql-engine/blob/master/nix/overlays/ghc.nix
 self: super:
 let
   ghcVersion = "9.0.2";
