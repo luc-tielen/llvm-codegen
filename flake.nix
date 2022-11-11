@@ -1,7 +1,7 @@
 {
   description = "llvm-codegen: LLVM code generation using Haskell";
   inputs = {
-    np.url = "github:nixos/nixpkgs?ref=haskell-updates";
+    np.url = "github:nixos/nixpkgs?ref=master";
     fu.url = "github:numtide/flake-utils?ref=master";
     ds.url = "github:numtide/devshell?ref=master";
     nf.url = "github:numtide/nix-filter?ref=master";
@@ -57,7 +57,7 @@
           imports = [ ];
           packages = with pkgs;
             with haskellPackages; [
-              pkgs.llvmPackages_14.llvm.dev
+              pkgs."llvmPackages_${toString llvmVersion}".llvm.dev
               pkgs.ghcid
               (ghcWithPackages (p:
                 with p; [

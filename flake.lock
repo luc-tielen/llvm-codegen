@@ -85,16 +85,16 @@
     },
     "np": {
       "locked": {
-        "lastModified": 1651725581,
-        "narHash": "sha256-5KFbtrJIZ/KCdgo92qC8CYmOxcb2n+yOCeddCGkzviA=",
+        "lastModified": 1665993766,
+        "narHash": "sha256-+lPrbR7AREWwXpYWku0gWtw4FwHhc/sHTkW64KZXA5o=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "2ab8e66328a9979ce69ed6d48a7e0fa7de5d42cb",
+        "rev": "eaba04def711c69b5211d094bb5d673423121ae0",
         "type": "github"
       },
       "original": {
         "owner": "nixos",
-        "ref": "haskell-updates",
+        "ref": "master",
         "repo": "nixpkgs",
         "type": "github"
       }
