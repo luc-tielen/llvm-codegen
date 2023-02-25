@@ -44,13 +44,17 @@ newtype NameSupplyT m a
 
 instance MonadTrans NameSupplyT where
   lift = NameSupplyT . lift
+  {-# INLINABLE lift #-}
 
 instance StrictState.MonadState s m => StrictState.MonadState s (NameSupplyT m) where
   state = lift . StrictState.state
+  {-# INLINABLE state #-}
 
 instance MonadReader r m => MonadReader r (NameSupplyT m) where
   ask = lift ask
+  {-# INLINABLE ask #-}
   local = mapNameSupplyT . local
+  {-# INLINABLE local #-}
 
 -- TODO MonadWriter and other instances..
 
@@ -62,13 +66,16 @@ mapNameSupplyT nat (NameSupplyT m) =
   where
     f (a, _, _) = a
     g s b = (b, s, ())
+{-# INLINABLE mapNameSupplyT #-}
 
 instance MFunctor NameSupplyT where
   hoist nat = NameSupplyT . hoist nat . unNameSupplyT
+  {-# INLINABLE hoist #-}
 
 runNameSupplyT :: Monad m => NameSupplyT m a -> m a
 runNameSupplyT (NameSupplyT m) =
   fst <$> StrictRWS.evalRWST m Nothing (NameSupplyState 0 mempty)
+{-# INLINABLE runNameSupplyT #-}
 
 class Monad m => MonadNameSupply m where
   fresh :: m Name
@@ -77,12 +84,15 @@ class Monad m => MonadNameSupply m where
 
   default fresh :: (MonadTrans t, MonadNameSupply m1, m ~ t m1) => m Name
   fresh = lift fresh
+  {-# INLINABLE fresh #-}
 
   default getSuggestion :: (MonadTrans t, MonadNameSupply m1, m ~ t m1) => m (Maybe Name)
   getSuggestion = lift getSuggestion
+  {-# INLINABLE getSuggestion #-}
 
 instance Monad m => MonadNameSupply (NameSupplyT m) where
   getSuggestion = NameSupplyT ask
+  {-# INLINABLE getSuggestion #-}
 
   fresh = getSuggestion >>= \case
     Nothing -> NameSupplyT $ do
@@ -95,27 +105,36 @@ instance Monad m => MonadNameSupply (NameSupplyT m) where
           count = fromMaybe 0 mCount
       StrictState.modify $ \s -> s { nameMap = M.insert suggestion (count + 1) nameMapping }
       pure $ Name $ unName suggestion <> "_" <> T.pack (show count)
+  {-# INLINABLE fresh #-}
 
   m `named` name =
     NameSupplyT $ local (const $ Just name) $ unNameSupplyT m
+  {-# INLINABLE named #-}
 
 instance MonadNameSupply m => MonadNameSupply (StrictState.StateT s m) where
   named = flip (StrictState.mapStateT . flip named)
+  {-# INLINABLE named #-}
 
 instance MonadNameSupply m => MonadNameSupply (LazyState.StateT s m) where
   named = flip (LazyState.mapStateT . flip named)
+  {-# INLINABLE named #-}
 
 instance (MonadNameSupply m, Monoid w) => MonadNameSupply (StrictRWS.RWST r w s m) where
   named = flip (StrictRWS.mapRWST . flip named)
+  {-# INLINABLE named #-}
 
 instance (MonadNameSupply m, Monoid w) => MonadNameSupply (LazyRWS.RWST r w s m) where
   named = flip (LazyRWS.mapRWST . flip named)
+  {-# INLINABLE named #-}
 
 instance MonadNameSupply m => MonadNameSupply (ReaderT r m) where
   named = flip (mapReaderT . flip named)
+  {-# INLINABLE named #-}
 
 instance (MonadNameSupply m, Monoid w) => MonadNameSupply (WriterT w m) where
   named = flip (mapWriterT . flip named)
+  {-# INLINABLE named #-}
 
 instance MonadNameSupply m => MonadNameSupply (ExceptT e m) where
   named = flip (mapExceptT . flip named)
+  {-# INLINABLE named #-}

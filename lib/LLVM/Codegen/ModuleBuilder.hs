@@ -212,6 +212,7 @@ withFunctionAttributes f m = do
   liftModuleBuilderState $
     modify $ \s -> s { defaultFunctionAttributes = fnAttrs }
   pure result
+{-# INLINEABLE withFunctionAttributes #-}
 
 resetFunctionAttributes :: MonadModuleBuilder m => m ()
 resetFunctionAttributes =
@@ -245,14 +246,17 @@ function name args retTy fnBody = do
 emitDefinition :: MonadModuleBuilder m => Definition -> m ()
 emitDefinition def =
   liftModuleBuilderState $ modify $ \s -> s { definitions = DList.snoc (definitions s) def }
+{-# INLINEABLE emitDefinition #-}
 
 getTypedefs :: MonadModuleBuilder m => m (Map Name Type)
 getTypedefs =
   liftModuleBuilderState $ gets types
+{-# INLINEABLE getTypedefs #-}
 
 lookupType :: MonadModuleBuilder m => Name -> m (Maybe Type)
 lookupType name =
   liftModuleBuilderState $ gets (Map.lookup name . types)
+{-# INLINEABLE lookupType #-}
 
 addType :: MonadModuleBuilder m => Name -> Type -> m ()
 addType name ty =
@@ -262,6 +266,7 @@ global :: MonadModuleBuilder m => Name -> Type -> Constant -> m Operand
 global name ty constant = do
   emitDefinition $ GlobalDefinition $ GlobalVariable name ty constant
   pure $ ConstantOperand $ GlobalRef (ptr ty) name
+{-# INLINEABLE global #-}
 
 globalUtf8StringPtr :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
                     => T.Text -> Name -> m Operand
@@ -277,6 +282,7 @@ globalUtf8StringPtr txt name = do
                                     , ConstantOperand $ Int 32 0
                                     ]
   emitInstr (ptr i8) instr
+{-# INLINEABLE globalUtf8StringPtr #-}
 
 -- NOTE: typedefs are only allowed for structs, even though clang also allows it
 -- for primitive types. This is done to avoid weird inconsistencies with the LLVM JIT
@@ -287,11 +293,13 @@ typedef name packed tys = do
   emitDefinition $ TypeDefinition name (Clear ty)
   addType name ty
   pure $ NamedTypeReference name
+{-# INLINEABLE typedef #-}
 
 opaqueTypedef :: MonadModuleBuilder m => Name -> m Type
 opaqueTypedef name = do
   emitDefinition $ TypeDefinition name Opaque
   pure $ NamedTypeReference name
+{-# INLINEABLE opaqueTypedef #-}
 
 extern :: MonadModuleBuilder m => Name -> [Type] -> Type -> m Operand
 extern name argTys retTy = do
@@ -300,6 +308,7 @@ extern name argTys retTy = do
   emitDefinition $ GlobalDefinition $ Function name retTy args fnAttrs []
   let fnTy = ptr $ FunctionType retTy argTys
   pure $ ConstantOperand $ GlobalRef fnTy name
+{-# INLINEABLE extern #-}
 
 -- NOTE: Only used internally, this creates an unassigned operand
 mkOperand :: Monad m => Type -> ParameterName -> IRBuilderT m (Name, Operand)

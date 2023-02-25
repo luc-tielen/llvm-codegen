@@ -41,6 +41,7 @@ typeOf = \case
         ptr ty
       Undef ty ->
         ty
+{-# INLINEABLE typeOf #-}
 
 instance Pretty Operand where
   pretty = \case

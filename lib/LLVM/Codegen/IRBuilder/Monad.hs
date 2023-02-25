@@ -177,7 +177,6 @@ modifyCurrentBlock f =
   modifyIRBuilderState $ \s ->
     s { currentPartialBlock = f (currentPartialBlock s) }
 
-
 class Monad m => MonadIRBuilder m where
   modifyIRBuilderState :: (IRBuilderState -> IRBuilderState) -> m ()
 
@@ -216,4 +215,3 @@ instance Pretty BasicBlock where
       prettyStmt operand instr =
         let instrDoc = pretty instr
          in maybe instrDoc (\op -> pretty op <+> "=" <+> instrDoc) operand
-
