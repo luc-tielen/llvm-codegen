@@ -11,7 +11,7 @@ import qualified Data.List as L
 
 renderDoc :: Pretty a => a -> Text
 renderDoc =
-  renderStrict . layoutSmart defaultLayoutOptions { layoutPageWidth = Unbounded } . pretty
+  renderStrict . layoutPretty defaultLayoutOptions { layoutPageWidth = Unbounded } . pretty
 
 commas :: [Doc ann] -> Doc ann
 commas docs =
