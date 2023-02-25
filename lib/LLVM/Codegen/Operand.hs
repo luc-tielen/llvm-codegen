@@ -11,16 +11,16 @@ import Data.Word
 
 
 data Constant
-  = GlobalRef Type Name
-  | Array Type [Constant]
-  | Int Word32 Integer
-  | NullPtr Type
-  | Undef Type
+  = GlobalRef !Type !Name
+  | Array !Type ![Constant]
+  | Int !Word32 !Integer
+  | NullPtr !Type
+  | Undef !Type
   deriving (Eq, Ord, Show)
 
 data Operand
-  = LocalRef Type Name
-  | ConstantOperand Constant
+  = LocalRef !Type !Name
+  | ConstantOperand !Constant
   deriving (Eq, Ord, Show)
 
 typeOf :: Operand -> Type

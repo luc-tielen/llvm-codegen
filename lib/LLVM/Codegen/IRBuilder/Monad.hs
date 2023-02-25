@@ -41,22 +41,22 @@ import LLVM.Pretty
 
 data BasicBlock
   = BB
-  { bbName :: Name
-  , bbInstructions :: DList (Maybe Operand, IR)
-  , bbTerminator :: Terminator
+  { bbName :: !Name
+  , bbInstructions :: !(DList (Maybe Operand, IR))
+  , bbTerminator :: !Terminator
   } deriving Show
 
 data PartialBlock
   = PartialBlock
-  { pbName :: Name
-  , pbInstructions :: DList (Maybe Operand, IR)
-  , pbTerminator :: First Terminator
+  { pbName :: !Name
+  , pbInstructions :: !(DList (Maybe Operand, IR))
+  , pbTerminator :: !(First Terminator)
   }
 
 data IRBuilderState
   = IRBuilderState
-  { basicBlocks :: DList BasicBlock
-  , currentPartialBlock :: PartialBlock
+  { basicBlocks :: !(DList BasicBlock)
+  , currentPartialBlock :: !PartialBlock
   }
 
 newtype IRBuilderT m a
@@ -153,10 +153,12 @@ emitInstr ty instr = do
   operand <- mkOperand ty
   addInstrToCurrentBlock (Just operand) instr
   pure operand
+{-# INLINABLE emitInstr #-}
 
 emitInstrVoid :: MonadIRBuilder m => IR -> m ()
 emitInstrVoid =
   addInstrToCurrentBlock Nothing
+{-# INLINABLE emitInstrVoid #-}
 
 addInstrToCurrentBlock :: MonadIRBuilder m => Maybe Operand -> IR -> m ()
 addInstrToCurrentBlock operand instr =
@@ -168,6 +170,7 @@ emitTerminator :: MonadIRBuilder m => Terminator -> m ()
 emitTerminator term =
   modifyCurrentBlock $ \blk ->
     blk { pbTerminator = pbTerminator blk <> First (Just term) }
+{-# INLINABLE emitTerminator #-}
 
 modifyCurrentBlock :: MonadIRBuilder m => (PartialBlock -> PartialBlock) -> m ()
 modifyCurrentBlock f =

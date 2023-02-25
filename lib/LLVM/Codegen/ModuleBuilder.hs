@@ -49,6 +49,7 @@ import LLVM.Codegen.NameSupply
 import LLVM.Codegen.IR
 import LLVM.Pretty
 
+
 newtype Module
   = Module [Definition]
 
@@ -57,7 +58,7 @@ instance Pretty Module where
     vsep $ L.intersperse mempty $ map pretty defs
 
 data ParameterName
-  = ParameterName T.Text
+  = ParameterName !T.Text
   | NoParameterName
   deriving Show
 
@@ -65,24 +66,24 @@ instance IsString ParameterName where
   fromString = ParameterName . fromString
 
 data FunctionAttribute
-  = WasmExportName T.Text
+  = WasmExportName !T.Text
   | AlwaysInline
   -- Add more as needed..
   deriving Show
 
 data Global
-  = GlobalVariable Name Type Constant
-  | Function Name Type [(Type, ParameterName)] [FunctionAttribute] [BasicBlock]
+  = GlobalVariable !Name !Type !Constant
+  | Function !Name !Type ![(Type, ParameterName)] ![FunctionAttribute] ![BasicBlock]
   deriving Show
 
 data Typedef
   = Opaque
-  | Clear Type
+  | Clear !Type
   deriving Show
 
 data Definition
-  = GlobalDefinition Global
-  | TypeDefinition Name Typedef
+  = GlobalDefinition !Global
+  | TypeDefinition !Name !Typedef
   deriving Show
 
 instance Pretty Definition where
@@ -136,9 +137,9 @@ instance Pretty FunctionAttribute where
 
 data ModuleBuilderState
   = ModuleBuilderState
-  { definitions :: DList Definition
-  , types :: Map Name Type
-  , defaultFunctionAttributes :: [FunctionAttribute]
+  { definitions :: !(DList Definition)
+  , types :: !(Map Name Type)
+  , defaultFunctionAttributes :: ![FunctionAttribute]
   }
 
 newtype ModuleBuilderT m a
@@ -307,4 +308,3 @@ mkOperand ty paramName = do
     NoParameterName -> fresh
     ParameterName name -> fresh `named` Name name
   pure (name, LocalRef ty name)
-

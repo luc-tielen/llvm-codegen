@@ -18,13 +18,13 @@ import Data.Word
 data Packed
 
 data Type
-  = IntType Word32
-  | FunctionType Type [Type]
-  | PointerType Type
+  = IntType !Word32
+  | FunctionType !Type ![Type]
+  | PointerType !Type
   | VoidType
-  | StructureType (Flag Packed) [Type]
-  | ArrayType Word32 Type
-  | NamedTypeReference Name
+  | StructureType !(Flag Packed) ![Type]
+  | ArrayType !Word32 !Type
+  | NamedTypeReference !Name
   deriving (Eq, Ord, Show)
 
 i1, i8, i16, i32, i64 :: Type

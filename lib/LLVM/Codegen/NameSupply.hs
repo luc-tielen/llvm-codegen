@@ -30,8 +30,8 @@ type Counter = Int
 
 data NameSupplyState
   = NameSupplyState
-  { counter :: Counter
-  , nameMap :: Map Name Counter
+  { counter :: !Counter
+  , nameMap :: !(Map Name Counter)
   }
 
 newtype NameSupplyT m a

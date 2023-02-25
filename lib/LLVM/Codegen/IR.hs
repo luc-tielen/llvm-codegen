@@ -64,7 +64,9 @@ data ComparisonType
   deriving (Eq, Show)
 
 data TailCallAttribute
-  = Tail | MustTail | NoTail
+  = Tail
+  | MustTail
+  | NoTail
   deriving Show
 
 data CallingConvention
@@ -74,28 +76,28 @@ data CallingConvention
   deriving Show
 
 data IR
-  = Add (Flag NUW) (Flag NSW) Operand Operand
-  | Mul (Flag NUW) (Flag NSW) Operand Operand
-  | Sub (Flag NUW) (Flag NSW) Operand Operand
-  | Udiv (Flag Exact) Operand Operand
-  | And Operand Operand
-  | Trunc Operand Type
-  | Zext Operand Type
-  | Bitcast Operand Type
-  | ICmp ComparisonType Operand Operand
-  | PtrToInt Operand Type
-  | Alloca Type (Maybe Operand) Int
-  | GetElementPtr (Flag Inbounds) Operand [Operand]
-  | Load (Flag Volatile) Operand (Maybe Atomicity) Alignment
-  | Store (Flag Volatile) Operand Operand (Maybe Atomicity) Alignment
-  | Phi (NonEmpty (Operand, Name))
-  | Call (Maybe TailCallAttribute) CallingConvention Operand [Operand]  -- TODO support param attributes
+  = Add !(Flag NUW) !(Flag NSW) !Operand !Operand
+  | Mul !(Flag NUW) !(Flag NSW) !Operand !Operand
+  | Sub !(Flag NUW) !(Flag NSW) !Operand !Operand
+  | Udiv !(Flag Exact) !Operand !Operand
+  | And !Operand !Operand
+  | Trunc !Operand !Type
+  | Zext !Operand !Type
+  | Bitcast !Operand !Type
+  | ICmp !ComparisonType !Operand !Operand
+  | PtrToInt !Operand !Type
+  | Alloca !Type !(Maybe Operand) !Int
+  | GetElementPtr !(Flag Inbounds) !Operand ![Operand]
+  | Load !(Flag Volatile) !Operand !(Maybe Atomicity) !Alignment
+  | Store !(Flag Volatile) !Operand !Operand !(Maybe Atomicity) !Alignment
+  | Phi !(NonEmpty (Operand, Name))
+  | Call !(Maybe TailCallAttribute) !CallingConvention !Operand ![Operand]  -- TODO support param attributes
   -- Terminators
-  | Ret (Maybe Operand)
-  | Br Name
-  | CondBr Operand Name Name
-  | Switch Operand Name [(Operand, Name)]
-  | Select Operand Operand Operand
+  | Ret !(Maybe Operand)
+  | Br !Name
+  | CondBr !Operand !Name !Name
+  | Switch !Operand !Name ![(Operand, Name)]
+  | Select !Operand !Operand !Operand
   deriving Show
 
 newtype Terminator
