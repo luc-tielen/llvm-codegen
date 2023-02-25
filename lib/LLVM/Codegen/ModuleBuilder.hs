@@ -153,10 +153,13 @@ type ModuleBuilder = ModuleBuilderT Identity
 
 instance MonadTrans ModuleBuilderT where
   lift = ModuleBuilderT . lift
+  {-# INLINEABLE lift #-}
 
 instance MonadReader r m => MonadReader r (ModuleBuilderT m) where
   ask = lift ask
+  {-# INLINEABLE ask #-}
   local = mapModuleBuilderT . local
+  {-# INLINEABLE local #-}
 
 mapModuleBuilderT :: (Functor m, Monad n) => (m a -> n a) -> ModuleBuilderT m a -> ModuleBuilderT n a
 mapModuleBuilderT f (ModuleBuilderT inner) =
@@ -165,12 +168,15 @@ mapModuleBuilderT f (ModuleBuilderT inner) =
     LazyState.mapStateT (g s) inner
   where
     g s = fmap (,s) . f . fmap fst
+{-# INLINEABLE mapModuleBuilderT #-}
 
 instance MonadState s m => MonadState s (ModuleBuilderT m) where
   state = lift . LazyState.state
+  {-# INLINEABLE state #-}
 
 instance MFunctor ModuleBuilderT where
   hoist nat = ModuleBuilderT . hoist nat . unModuleBuilderT
+  {-# INLINEABLE hoist #-}
 
 class Monad m => MonadModuleBuilder m where
   liftModuleBuilderState :: State ModuleBuilderState a -> m a
@@ -180,10 +186,12 @@ class Monad m => MonadModuleBuilder m where
     => State ModuleBuilderState a
     -> m a
   liftModuleBuilderState = lift . liftModuleBuilderState
+  {-# INLINEABLE liftModuleBuilderState #-}
 
 instance Monad m => MonadModuleBuilder (ModuleBuilderT m) where
   liftModuleBuilderState (StateT s) =
     ModuleBuilderT $ StateT $ pure . runIdentity . s
+  {-# INLINEABLE liftModuleBuilderState #-}
 
 instance MonadModuleBuilder m => MonadModuleBuilder (IRBuilderT m)
 instance MonadModuleBuilder m => MonadModuleBuilder (StrictState.StateT s m)
@@ -199,6 +207,7 @@ runModuleBuilderT (ModuleBuilderT m) =
   Module . DList.toList . definitions <$> execStateT m beginState
   where
     beginState = ModuleBuilderState mempty mempty []
+{-# INLINEABLE runModuleBuilderT #-}
 
 withFunctionAttributes
   :: MonadModuleBuilder m
@@ -218,13 +227,16 @@ resetFunctionAttributes :: MonadModuleBuilder m => m ()
 resetFunctionAttributes =
   liftModuleBuilderState $
     modify $ \s -> s { defaultFunctionAttributes = mempty }
+{-# INLINEABLE resetFunctionAttributes #-}
 
 getDefaultFunctionAttributes :: MonadModuleBuilder m => m [FunctionAttribute]
 getDefaultFunctionAttributes =
   liftModuleBuilderState $ gets defaultFunctionAttributes
+{-# INLINEABLE getDefaultFunctionAttributes #-}
 
 runModuleBuilder :: ModuleBuilder a -> Module
 runModuleBuilder = runIdentity . runModuleBuilderT
+{-# INLINEABLE runModuleBuilder #-}
 
 function :: (HasCallStack, MonadModuleBuilder m)
          => Name -> [(Type, ParameterName)] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
@@ -242,6 +254,7 @@ function name args retTy fnBody = do
   let args' = zipWith (\argName (ty, _) -> (ty, ParameterName $ unName argName)) names args
   emitDefinition $ GlobalDefinition $ Function name retTy args' fnAttrs instrs
   pure $ ConstantOperand $ GlobalRef (ptr (FunctionType retTy $ map fst args)) name
+{-# INLINEABLE function #-}
 
 emitDefinition :: MonadModuleBuilder m => Definition -> m ()
 emitDefinition def =
@@ -261,6 +274,7 @@ lookupType name =
 addType :: MonadModuleBuilder m => Name -> Type -> m ()
 addType name ty =
   liftModuleBuilderState $ modify $ \s -> s { types = Map.insert name ty (types s) }
+{-# INLINEABLE addType #-}
 
 global :: MonadModuleBuilder m => Name -> Type -> Constant -> m Operand
 global name ty constant = do
@@ -317,3 +331,4 @@ mkOperand ty paramName = do
     NoParameterName -> fresh
     ParameterName name -> fresh `named` Name name
   pure (name, LocalRef ty name)
+{-# INLINEABLE mkOperand #-}

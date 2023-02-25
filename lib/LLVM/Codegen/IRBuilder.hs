@@ -266,6 +266,7 @@ if' condition asm = mdo
   br end
   end <- block `named` "end_if"
   pure ()
+{-# INLINEABLE if' #-}
 
 loop :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m, MonadFix m) => m a -> m ()
 loop asm = mdo
@@ -273,6 +274,7 @@ loop asm = mdo
   begin <- block `named` "loop"
   _ <- asm
   br begin
+{-# INLINEABLE loop #-}
 
 loopWhile :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m, MonadFix m)
           => m Operand -> m a -> m ()
@@ -286,6 +288,7 @@ loopWhile condition asm = mdo
   br begin
   end <- block `named` "while_end"
   pure ()
+{-# INLINEABLE loopWhile #-}
 
 loopFor :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, MonadFix m)
         => Operand
@@ -307,6 +310,7 @@ loopFor beginValue condition post asm = mdo
   br begin
   end <- block `named` "for_end"
   pure ()
+{-# INLINEABLE loopFor #-}
 
 -- NOTE: diff is in bytes! (Different compared to C and C++)
 pointerDiff :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m)

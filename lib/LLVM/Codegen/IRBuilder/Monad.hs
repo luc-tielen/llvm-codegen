@@ -68,7 +68,9 @@ newtype IRBuilderT m a
 
 instance MonadReader r m => MonadReader r (IRBuilderT m) where
   ask = lift ask
+  {-# INLINEABLE ask #-}
   local = mapIRBuilderT . local
+  {-# INLINEABLE local #-}
 
 -- TODO MonadWriter
 
@@ -79,15 +81,19 @@ mapIRBuilderT f (IRBuilderT inner) =
     LazyState.mapStateT (mapNameSupplyT $ g s) inner
   where
     g s = fmap (,s) . f . fmap fst
+{-# INLINEABLE mapIRBuilderT #-}
 
 instance MonadState s m => MonadState s (IRBuilderT m) where
   state = lift . StrictState.state
+  {-# INLINEABLE state #-}
 
 instance MonadTrans IRBuilderT where
   lift = IRBuilderT . lift . lift
+  {-# INLINEABLE lift #-}
 
 instance MFunctor IRBuilderT where
   hoist nat = IRBuilderT . hoist (hoist nat) . unIRBuilderT
+  {-# INLINEABLE hoist #-}
 
 type IRBuilder = IRBuilderT Identity
 
@@ -101,14 +107,17 @@ runIRBuilderT (IRBuilderT m) = do
       let previousBlocks = DList.apply (basicBlocks irState) mempty
           currentBlk = currentPartialBlock irState
        in previousBlocks ++ [partialBlockToBasicBlock currentBlk]
+{-# INLINEABLE runIRBuilderT #-}
 
 runIRBuilder :: IRBuilder a -> (a, [BasicBlock])
 runIRBuilder = runIdentity . runIRBuilderT
+{-# INLINEABLE runIRBuilder #-}
 
 partialBlockToBasicBlock :: PartialBlock -> BasicBlock
 partialBlockToBasicBlock pb =
   let currentTerm = fromMaybe (Terminator $ Ret Nothing) $ getFirst $ pbTerminator pb
   in BB (pbName pb) (pbInstructions pb) currentTerm
+{-# INLINEABLE partialBlockToBasicBlock #-}
 
 block :: (MonadNameSupply m, MonadIRBuilder m) => m Name
 block = do
@@ -120,6 +129,7 @@ block = do
 
   emitBlockStart blockName
   pure blockName
+{-# INLINEABLE block #-}
 
 emitBlockStart :: (MonadNameSupply m, MonadIRBuilder m) => Name -> m ()
 emitBlockStart blockName =
@@ -142,6 +152,7 @@ emitBlockStart blockName =
      in s { basicBlocks = DList.snoc blocks newBlock
           , currentPartialBlock = PartialBlock blockName mempty mempty
           }
+{-# INLINEABLE emitBlockStart #-}
 
 -- NOTE: Only used internally, this creates an unassigned operand
 mkOperand :: (MonadNameSupply m, MonadIRBuilder m) => Type -> m Operand
@@ -165,6 +176,7 @@ addInstrToCurrentBlock operand instr =
   modifyCurrentBlock $ \blk ->
     let instrs = DList.snoc (pbInstructions blk) (operand, instr)
       in blk { pbInstructions = instrs }
+{-# INLINEABLE addInstrToCurrentBlock #-}
 
 emitTerminator :: MonadIRBuilder m => Terminator -> m ()
 emitTerminator term =
@@ -176,6 +188,7 @@ modifyCurrentBlock :: MonadIRBuilder m => (PartialBlock -> PartialBlock) -> m ()
 modifyCurrentBlock f =
   modifyIRBuilderState $ \s ->
     s { currentPartialBlock = f (currentPartialBlock s) }
+{-# INLINEABLE modifyCurrentBlock #-}
 
 class Monad m => MonadIRBuilder m where
   modifyIRBuilderState :: (IRBuilderState -> IRBuilderState) -> m ()
@@ -187,17 +200,21 @@ class Monad m => MonadIRBuilder m where
     => (IRBuilderState -> IRBuilderState)
     -> m ()
   modifyIRBuilderState = lift . modifyIRBuilderState
+  {-# INLINEABLE modifyIRBuilderState #-}
 
   default currentBlock
     :: (MonadTrans t, MonadIRBuilder m1, m ~ t m1)
     => m Name
   currentBlock =
     lift currentBlock
+  {-# INLINEABLE currentBlock #-}
 
 instance Monad m => MonadIRBuilder (IRBuilderT m) where
   modifyIRBuilderState = IRBuilderT . modify
+  {-# INLINEABLE modifyIRBuilderState #-}
   currentBlock =
     IRBuilderT $ LazyState.gets (pbName . currentPartialBlock)
+  {-# INLINEABLE currentBlock #-}
 
 instance MonadIRBuilder m => MonadIRBuilder (StrictState.StateT s m)
 instance MonadIRBuilder m => MonadIRBuilder (LazyState.StateT s m)
