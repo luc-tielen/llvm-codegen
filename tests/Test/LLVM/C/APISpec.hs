@@ -49,6 +49,14 @@ spec = describe "LLVM C API" $ parallel $ do
     withForeignPtr llvmMod $ \llvmModule ->
       llvmModule `shouldNotBe` nullPtr
 
+  it "can set the target data for a LLVM module" $ do
+    ctx <- C.mkContext
+    newTd <- C.mkTargetData "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-n32:64-S128-ni:1:10:20"  -- WASM layout
+    llvmMod <- C.mkModule ctx "test"
+    C.setTargetData llvmMod newTd
+    td <- C.getTargetData llvmMod
+    td `shouldNotBe` nullPtr
+
   it "can extract the target data from a LLVM module" $ do
     ctx <- C.mkContext
     llvmMod <- C.mkModule ctx "test"

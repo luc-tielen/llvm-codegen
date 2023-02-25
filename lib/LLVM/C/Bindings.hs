@@ -7,6 +7,9 @@ module LLVM.C.Bindings
   , llvmContextDispose
   , llvmCreateModuleWithName
   , llvmDisposeModule
+  , llvmCreateTargetData
+  , llvmDisposeTargetData
+  , llvmSetTargetData
   , llvmGetTargetData
   , llvmSizeOfType
   , llvmVoidTypeInContext
@@ -47,6 +50,15 @@ foreign import ccall unsafe "LLVMModuleCreateWithNameInContext" llvmCreateModule
 
 foreign import ccall unsafe "&LLVMDisposeModule" llvmDisposeModule
   :: FunPtr (Ptr Module -> IO ())
+
+foreign import ccall unsafe "LLVMCreateTargetData" llvmCreateTargetData
+  :: CString -> IO (Ptr TargetData)
+
+foreign import ccall unsafe "&LLVMDisposeTargetData" llvmDisposeTargetData
+  :: FunPtr (Ptr TargetData -> IO ())
+
+foreign import ccall unsafe "LLVMSetModuleDataLayout" llvmSetTargetData
+  :: Ptr Module -> Ptr TargetData -> IO ()
 
 foreign import ccall unsafe "LLVMGetModuleDataLayout" llvmGetTargetData
   :: Ptr Module -> IO (Ptr TargetData)

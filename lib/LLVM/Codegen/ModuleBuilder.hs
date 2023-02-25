@@ -9,6 +9,7 @@ module LLVM.Codegen.ModuleBuilder
   , Module(..)
   , Definition(..)
   , ParameterName(..)
+  , FunctionAttribute(..)
   , function
   , global
   , globalUtf8StringPtr
@@ -17,8 +18,10 @@ module LLVM.Codegen.ModuleBuilder
   , opaqueTypedef
   , getTypedefs
   , lookupType
+  , withFunctionAttributes
   ) where
 
+import GHC.Stack
 import Control.Monad.State.Lazy (StateT(..), MonadState, State, execStateT, modify, gets)
 import qualified Control.Monad.State.Strict as StrictState
 import qualified Control.Monad.State.Lazy as LazyState
@@ -61,9 +64,15 @@ data ParameterName
 instance IsString ParameterName where
   fromString = ParameterName . fromString
 
+data FunctionAttribute
+  = WasmExportName T.Text
+  | AlwaysInline
+  -- Add more as needed..
+  deriving Show
+
 data Global
   = GlobalVariable Name Type Constant
-  | Function Name Type [(Type, ParameterName)] [BasicBlock]
+  | Function Name Type [(Type, ParameterName)] [FunctionAttribute] [BasicBlock]
   deriving Show
 
 data Typedef
@@ -90,11 +99,11 @@ instance Pretty Global where
   pretty = \case
     GlobalVariable name ty constant ->
       "@" <> pretty name <+> "=" <+> "global" <+> pretty ty <+> pretty constant
-    Function name retTy args body
+    Function name retTy args attrs body
       | null body ->
-        "declare external ccc" <+> pretty retTy <+> fnName <> toTuple (map (pretty . fst) args)
+        "declare external ccc" <+> pretty retTy <+> fnName <> toTuple (map (pretty . fst) args) <> prettyAttrs
       | otherwise ->
-        "define external ccc" <+> pretty retTy <+> fnName <> toTuple (zipWith prettyArg [0..] args) <+>
+        "define external ccc" <+> pretty retTy <+> fnName <> toTuple (zipWith prettyArg [0..] args) <> prettyAttrs <+>
           "{" <> hardline <>
           prettyBody body <> hardline <>
           "}"
@@ -107,16 +116,29 @@ instance Pretty Global where
               pretty argTy <+> pretty (LocalRef argTy $ Name $ T.pack $ show i)
             ParameterName paramName ->
               pretty argTy <+> pretty (LocalRef argTy $ Name paramName)
-        prettyBody blocks = vsep $ map pretty blocks
+        prettyBody blocks =
+          vsep $ map pretty blocks
+        prettyAttrs =
+          if null attrs
+            then mempty
+            else mempty <+> hsep (map pretty attrs)
         toTuple argDocs =
           parens $ argDocs `sepBy` ", "
         sepBy docs separator =
           mconcat $ L.intersperse separator docs
 
+instance Pretty FunctionAttribute where
+  pretty = \case
+    AlwaysInline ->
+      "alwaysinline"
+    WasmExportName name ->
+      dquotes "wasm-export-name" <> "=" <> dquotes (pretty name)
+
 data ModuleBuilderState
   = ModuleBuilderState
   { definitions :: DList Definition
   , types :: Map Name Type
+  , defaultFunctionAttributes :: [FunctionAttribute]
   }
 
 newtype ModuleBuilderT m a
@@ -175,19 +197,48 @@ runModuleBuilderT :: Monad m => ModuleBuilderT m a -> m Module
 runModuleBuilderT (ModuleBuilderT m) =
   Module . DList.toList . definitions <$> execStateT m beginState
   where
-    beginState = ModuleBuilderState mempty mempty
+    beginState = ModuleBuilderState mempty mempty []
+
+withFunctionAttributes
+  :: MonadModuleBuilder m
+  => ([FunctionAttribute] -> [FunctionAttribute])
+  -> m a -> m a
+withFunctionAttributes f m = do
+  fnAttrs <- liftModuleBuilderState (gets defaultFunctionAttributes)
+  liftModuleBuilderState $
+    modify $ \s -> s { defaultFunctionAttributes = f fnAttrs }
+  result <- m
+  liftModuleBuilderState $
+    modify $ \s -> s { defaultFunctionAttributes = fnAttrs }
+  pure result
+
+resetFunctionAttributes :: MonadModuleBuilder m => m ()
+resetFunctionAttributes =
+  liftModuleBuilderState $
+    modify $ \s -> s { defaultFunctionAttributes = mempty }
+
+getDefaultFunctionAttributes :: MonadModuleBuilder m => m [FunctionAttribute]
+getDefaultFunctionAttributes =
+  liftModuleBuilderState $ gets defaultFunctionAttributes
 
 runModuleBuilder :: ModuleBuilder a -> Module
 runModuleBuilder = runIdentity . runModuleBuilderT
 
-function :: MonadModuleBuilder m => Name -> [(Type, ParameterName)] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
+function :: (HasCallStack, MonadModuleBuilder m)
+         => Name -> [(Type, ParameterName)] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
 function name args retTy fnBody = do
+  fnAttrs <- getDefaultFunctionAttributes
+
   (names, instrs) <- runIRBuilderT $ do
     (names, operands) <- unzip <$> traverse (uncurry mkOperand) args
+    resetFunctionAttributes  -- This is done to avoid functions emitted in the body that not automatically copy the same attributes
     _ <- fnBody operands
     pure names
+
+  liftModuleBuilderState $
+    modify $ \s -> s { defaultFunctionAttributes = fnAttrs }
   let args' = zipWith (\argName (ty, _) -> (ty, ParameterName $ unName argName)) names args
-  emitDefinition $ GlobalDefinition $ Function name retTy args' instrs
+  emitDefinition $ GlobalDefinition $ Function name retTy args' fnAttrs instrs
   pure $ ConstantOperand $ GlobalRef (ptr (FunctionType retTy $ map fst args)) name
 
 emitDefinition :: MonadModuleBuilder m => Definition -> m ()
@@ -211,7 +262,8 @@ global name ty constant = do
   emitDefinition $ GlobalDefinition $ GlobalVariable name ty constant
   pure $ ConstantOperand $ GlobalRef (ptr ty) name
 
-globalUtf8StringPtr :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m) => T.Text -> Name -> m Operand
+globalUtf8StringPtr :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+                    => T.Text -> Name -> m Operand
 globalUtf8StringPtr txt name = do
   let utf8Bytes = BS.snoc (TE.encodeUtf8 txt) 0  -- 0-terminated UTF8 string
       llvmValues = map (Int 8 . toInteger) $ BS.unpack utf8Bytes
@@ -243,7 +295,8 @@ opaqueTypedef name = do
 extern :: MonadModuleBuilder m => Name -> [Type] -> Type -> m Operand
 extern name argTys retTy = do
   let args = [(argTy, ParameterName "") | argTy <- argTys]
-  emitDefinition $ GlobalDefinition $ Function name retTy args []
+  fnAttrs <- getDefaultFunctionAttributes
+  emitDefinition $ GlobalDefinition $ Function name retTy args fnAttrs []
   let fnTy = ptr $ FunctionType retTy argTys
   pure $ ConstantOperand $ GlobalRef fnTy name
 

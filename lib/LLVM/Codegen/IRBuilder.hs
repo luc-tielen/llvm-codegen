@@ -84,48 +84,48 @@ import LLVM.Codegen.ModuleBuilder
 
 -- Helpers for generating instructions:
 
-add :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
+add :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 add lhs rhs =
   emitInstr (typeOf lhs) $ Add Off Off lhs rhs
 
-mul :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
+mul :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 mul lhs rhs =
   emitInstr (typeOf lhs) $ Mul Off Off lhs rhs
 
-sub :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
+sub :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 sub lhs rhs =
   emitInstr (typeOf lhs) $ Sub Off Off lhs rhs
 
-udiv :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
+udiv :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 udiv lhs rhs =
   emitInstr (typeOf lhs) $ Udiv Off lhs rhs
 
-and :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
+and :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 and lhs rhs =
   emitInstr (typeOf lhs) $ And lhs rhs
 
-trunc :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Type -> m Operand
+trunc :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
 trunc val ty =
   emitInstr ty $ Trunc val ty
 
-zext :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Type -> m Operand
+zext :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
 zext val ty =
   emitInstr ty $ Zext val ty
 
-ptrtoint :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Type -> m Operand
+ptrtoint :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
 ptrtoint val ty =
   emitInstr ty $ PtrToInt val ty
 
-bitcast :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Type -> m Operand
+bitcast :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
 bitcast val ty =
   emitInstr ty $ Bitcast val ty
 
-icmp :: (MonadNameSupply m, MonadIRBuilder m) => ComparisonType -> Operand -> Operand -> m Operand
+icmp :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => ComparisonType -> Operand -> Operand -> m Operand
 icmp cmp a b =
   emitInstr i1 $ ICmp cmp a b
 
 eq, ne, sge, sgt, sle, slt, uge, ugt, ule, ult
-  :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> m Operand
+  :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 eq = icmp EQ
 ne = icmp NE
 sge = icmp SGE
@@ -138,7 +138,7 @@ ule = icmp ULE
 ult = icmp ULT
 
 
-alloca :: (MonadNameSupply m, MonadIRBuilder m) => Type -> (Maybe Operand) -> Int -> m Operand
+alloca :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Type -> Maybe Operand -> Int -> m Operand
 alloca ty numElems alignment =
   emitInstr (ptr ty) $ Alloca ty numElems alignment
 
@@ -174,7 +174,7 @@ load address align =
     t ->
       error $ "Malformed AST: Expected a pointer type" <> show t
 
-store :: MonadIRBuilder m => Operand -> Alignment -> Operand -> m ()
+store :: (MonadIRBuilder m, HasCallStack) => Operand -> Alignment -> Operand -> m ()
 store address align value =
   emitInstrVoid $ Store Off address value Nothing align
 
@@ -201,31 +201,31 @@ call fn args = case typeOf fn of
           pure $ ConstantOperand $ Undef void  -- Invalid, but isn't rendered anyway
         else emitInstr resultTy $ Call Nothing C fn args
 
-ret :: MonadIRBuilder m => Operand -> m ()
+ret :: (HasCallStack, MonadIRBuilder m) => Operand -> m ()
 ret val =
   emitTerminator (Terminator (Ret (Just val)))
 
-retVoid :: MonadIRBuilder m => m ()
+retVoid :: (HasCallStack, MonadIRBuilder m) => m ()
 retVoid =
   emitTerminator (Terminator (Ret Nothing))
 
-br :: MonadIRBuilder m => Name -> m ()
+br :: (MonadIRBuilder m, HasCallStack) => Name -> m ()
 br label =
   emitTerminator (Terminator (Br label))
 
-condBr :: MonadIRBuilder m => Operand -> Name -> Name -> m ()
+condBr :: (HasCallStack, MonadIRBuilder m) => Operand -> Name -> Name -> m ()
 condBr cond trueLabel falseLabel =
   emitTerminator (Terminator (CondBr cond trueLabel falseLabel))
 
-switch :: MonadIRBuilder m => Operand -> Name -> [(Operand, Name)] -> m ()
+switch :: (HasCallStack, MonadIRBuilder m) => Operand -> Name -> [(Operand, Name)] -> m ()
 switch value defaultDest dests =
   emitTerminator $ Terminator $ Switch value defaultDest dests
 
-select :: (MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> Operand -> m Operand
+select :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> Operand -> m Operand
 select c t f =
   emitInstr (typeOf t) $ Select c t f
 
-if' :: (MonadNameSupply m, MonadIRBuilder m, MonadFix m)
+if' :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m, MonadFix m)
     => Operand -> m a -> m ()
 if' condition asm = mdo
   condBr condition ifBlock end
@@ -235,14 +235,14 @@ if' condition asm = mdo
   end <- block `named` "end_if"
   pure ()
 
-loop :: (MonadNameSupply m, MonadIRBuilder m, MonadFix m) => m a -> m ()
+loop :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m, MonadFix m) => m a -> m ()
 loop asm = mdo
   br begin
   begin <- block `named` "loop"
   _ <- asm
   br begin
 
-loopWhile :: (MonadNameSupply m, MonadIRBuilder m, MonadFix m)
+loopWhile :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m, MonadFix m)
           => m Operand -> m a -> m ()
 loopWhile condition asm = mdo
   br begin
@@ -255,7 +255,7 @@ loopWhile condition asm = mdo
   end <- block `named` "while_end"
   pure ()
 
-loopFor :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, MonadFix m)
+loopFor :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, MonadFix m)
         => Operand
         -> (Operand -> m Operand)
         -> (Operand -> m Operand)
@@ -277,7 +277,7 @@ loopFor beginValue condition post asm = mdo
   pure ()
 
 -- NOTE: diff is in bytes! (Different compared to C and C++)
-pointerDiff :: (MonadNameSupply m, MonadIRBuilder m)
+pointerDiff :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m)
             => Type -> Operand -> Operand -> m Operand
 pointerDiff ty a b = do
   a' <- ptrtoint a i64
@@ -288,7 +288,7 @@ pointerDiff ty a b = do
 -- | Calculates the logical not of a boolean 'Operand'.
 --   NOTE: This assumes the 'Operand' is of type 'i1', this is not checked!
 --   Passing in an argument of another width will lead to a crash in LLVM.
-not' :: (MonadNameSupply m, MonadIRBuilder m)
+not' :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m)
      => Operand -> m Operand
 not' bool =
   select bool (bit 0) (bit 1)
@@ -296,7 +296,7 @@ not' bool =
 data Signedness = Signed | Unsigned
 
 --   NOTE: No check is made if the 2 operands have the same 'Type'!
-minimum' :: (MonadNameSupply m, MonadIRBuilder m)
+minimum' :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m)
          => Signedness -> Operand -> Operand -> m Operand
 minimum' sign a b = do
   let inst = case sign of
@@ -305,7 +305,7 @@ minimum' sign a b = do
   isLessThan <- inst a b
   select isLessThan a b
 
-allocate :: (MonadNameSupply m, MonadIRBuilder m) => Type -> Operand -> m Operand
+allocate :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m) => Type -> Operand -> m Operand
 allocate ty beginValue = do
   value <- alloca ty Nothing 0
   store value 0 beginValue
@@ -326,7 +326,7 @@ Path a2b ->> Path b2c =
                else NE.toList b2c
    in Path $ NE.head a2b :| (NE.tail a2b ++ b2c')
 
-addr :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+addr :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
      => Path a b -> Operand -> m Operand
 addr path p = gep p (pathToIndices path)
   where
@@ -334,19 +334,19 @@ addr path p = gep p (pathToIndices path)
     pathToIndices (Path indices) =
       NE.toList indices
 
-deref :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+deref :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
       => Path a b -> Operand -> m Operand
 deref path p = do
   address <- addr path p
   load address 0
 
-assign :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+assign :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
        => Path a b -> Operand -> Operand -> m ()
 assign path p value = do
   dstAddr <- addr path p
   store dstAddr 0 value
 
-update :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+update :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
        => Path a b
        -> Operand
        -> (Operand -> m Operand)
@@ -355,18 +355,18 @@ update path p f = do
   dstAddr <- addr path p
   store dstAddr 0 =<< f =<< load dstAddr 0
 
-increment :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+increment :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
           => (Integer -> Operand) -> Path a b -> Operand -> m ()
 increment ty path p =
   update path p (add (ty 1))
 
-copy :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+copy :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
      => Path a b -> Operand -> Operand -> m ()
 copy path src dst = do
   value <- deref path src
   assign path dst value
 
-swap :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+swap :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
      => Path a b -> Operand -> Operand -> m ()
 swap path lhs rhs = do
   tmp <- deref path lhs

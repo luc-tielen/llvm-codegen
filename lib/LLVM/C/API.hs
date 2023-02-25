@@ -5,6 +5,8 @@ module LLVM.C.API
   , Type
   , mkContext
   , mkModule
+  , mkTargetData
+  , setTargetData
   , getTargetData
   , sizeOfType
 
@@ -108,6 +110,19 @@ mkModule ctx name =
       -- newForeignPtr llvmDisposeModule llvmModule
       -- TODO: no longer need foreignptr wrapper then?
       newForeignPtr_  llvmModule
+
+-- NOTE: no checks are made against the datalayout
+mkTargetData :: String -> IO (ForeignPtr TargetData)
+mkTargetData dl = mask_ $ do
+  withCString dl $ \dlStr -> do
+    td <- llvmCreateTargetData dlStr
+    newForeignPtr llvmDisposeTargetData td
+
+setTargetData :: ForeignPtr Module -> ForeignPtr TargetData -> IO ()
+setTargetData llvmModule targetData = do
+  withForeignPtr llvmModule $ \m ->
+    withForeignPtr targetData $ \td ->
+      llvmSetTargetData m td
 
 getTargetData :: ForeignPtr Module -> IO (Ptr TargetData)
 getTargetData llvmModule =
