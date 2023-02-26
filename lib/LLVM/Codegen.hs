@@ -21,4 +21,4 @@ import Data.Text
 
 
 ppllvm :: Module -> Text
-ppllvm = renderDoc
+ppllvm = renderDoc renderModule

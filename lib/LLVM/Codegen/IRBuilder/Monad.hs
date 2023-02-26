@@ -13,6 +13,7 @@ module LLVM.Codegen.IRBuilder.Monad
   , emitInstr
   , emitInstrVoid
   , emitTerminator
+  , renderBasicBlock
   ) where
 
 -- NOTE: this module only exists to solve a cyclic import
@@ -36,6 +37,7 @@ import LLVM.Codegen.NameSupply
 import LLVM.Codegen.Operand
 import LLVM.Codegen.IR
 import LLVM.Codegen.Type
+import LLVM.Codegen.Name
 import LLVM.Pretty
 
 
@@ -224,11 +226,17 @@ instance MonadIRBuilder m => MonadIRBuilder (ReaderT r m)
 instance (MonadIRBuilder m, Monoid w) => MonadIRBuilder (WriterT w m)
 instance MonadIRBuilder m => MonadIRBuilder (ExceptT e m)
 
-instance Pretty BasicBlock where
-  pretty (BB (Name name) stmts (Terminator term)) =
-    let prettyStmts = indent 2 $ vsep $ map (uncurry prettyStmt) (DList.apply stmts []) ++ [pretty term]
-     in vsep [ pretty name <> ":", prettyStmts ]
-    where
-      prettyStmt operand instr =
-        let instrDoc = pretty instr
-         in maybe instrDoc (\op -> pretty op <+> "=" <+> instrDoc) operand
+renderBasicBlock :: Renderer BasicBlock
+renderBasicBlock buf (BB name stmts (Terminator term)) =
+  if null stmts
+    then (renderName buf name |># ":\n  "#) `renderIR` term
+    else (vsep (renderName buf name |># ":\n"#) stmts' renderStmt |># "\n  "#) `renderIR` term
+  where
+    stmts' = DList.apply stmts []
+    renderStmt :: Buffer %1 -> (Maybe Operand, IR) -> Buffer
+    renderStmt buf' (mOperand, instr) =
+      withIndent buf' (\buf'' -> renderStmt' buf'' mOperand instr)
+    renderStmt' :: Buffer %1 -> Maybe Operand -> IR -> Buffer
+    renderStmt' buf' mOperand instr =
+      renderMaybe buf' mOperand (\buf'' operand -> buf'' `renderOperand` operand |># " = "#) `renderIR` instr
+{-# INLINABLE renderBasicBlock #-}

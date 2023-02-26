@@ -1,5 +1,6 @@
 module LLVM.Codegen.Name
   ( Name(..)
+  , renderName
   ) where
 
 import Data.Text
@@ -12,6 +13,7 @@ newtype Name = Name { unName :: Text }
 instance IsString Name where
   fromString = Name . fromString
 
-instance Pretty Name where
-  pretty (Name name) =
-    pretty name
+renderName :: Renderer Name
+renderName buf (Name name) =
+  buf |> name
+{-# INLINABLE renderName #-}

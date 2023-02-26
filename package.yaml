@@ -18,8 +18,9 @@ dependencies:
   - containers == 0.*
   - mtl == 2.*
   - dlist == 1.*
-  - prettyprinter == 1.7.1
   - mmorph == 1.1.5
+  - text-builder-linear == 0.*
+  - ghc-prim == 0.*
 
 default-extensions:
   - OverloadedStrings
@@ -36,6 +37,8 @@ default-extensions:
   - FlexibleInstances
   - ScopedTypeVariables
   - DefaultSignatures
+  - LinearTypes
+  - MagicHash
 
 ghc-options:
   - -Wall

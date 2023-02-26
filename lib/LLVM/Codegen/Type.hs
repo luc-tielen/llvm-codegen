@@ -8,12 +8,13 @@ module LLVM.Codegen.Type
   , i64
   , ptr
   , void
+  , renderType
   ) where
 
 import LLVM.Codegen.Name
 import LLVM.Codegen.Flag
-import LLVM.Pretty
 import Data.Word
+import LLVM.Pretty
 
 data Packed
 
@@ -40,22 +41,23 @@ ptr = PointerType
 void :: Type
 void = VoidType
 
-instance Pretty Type where
-  pretty = \case
-    PointerType ty ->
-      pretty ty <> "*"
-    IntType bits ->
-      "i" <> pretty bits
-    FunctionType retTy argTys ->
-      pretty retTy <+> tupled (map pretty argTys)
-    NamedTypeReference name ->
-      "%" <> pretty name
-    VoidType ->
-      "void"
-    StructureType packed elemTys
-      | packed == On ->
-        "<{" <> commas (map pretty elemTys) <> "}>"
-      | otherwise ->
-        "{" <> commas (map pretty elemTys) <> "}"
-    ArrayType count ty ->
-      brackets $ pretty count <+> "x" <+> pretty ty
+renderType :: Renderer Type
+renderType buf = \case
+  PointerType ty ->
+    renderType buf ty |>. '*'
+  IntType bits ->
+    buf |>. 'i' |>$ bits
+  FunctionType retTy argTys ->
+    tupled (renderType buf retTy |>. ' ') argTys renderType
+  NamedTypeReference name ->
+    (buf |>. '%') `renderName` name
+  VoidType ->
+    buf |># "void"#
+  StructureType packed elemTys
+    | packed == On ->
+      commas (buf |># "<{"#) elemTys renderType |># "}>"#
+    | otherwise ->
+      braces buf (\buf' -> commas buf' elemTys renderType)
+  ArrayType count ty ->
+    brackets buf (\buf' -> (buf' |>$ count |># " x "#) `renderType` ty)
+{-# INLINABLE renderType #-}
