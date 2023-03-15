@@ -1,9 +1,7 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, RankNTypes, UnboxedTuples, MultiParamTypeClasses, UndecidableInstances #-}
 
 module LLVM.Codegen.ModuleBuilder
-  ( ModuleBuilderT
-  , ModuleBuilder
-  , runModuleBuilderT
+  ( ModuleBuilder
   , runModuleBuilder
   , MonadModuleBuilder
   , Module(..)
@@ -23,7 +21,6 @@ module LLVM.Codegen.ModuleBuilder
   ) where
 
 import GHC.Stack
-import Control.Monad.State.Lazy (StateT(..), MonadState, State, execStateT, modify, gets)
 import qualified Control.Monad.State.Strict as StrictState
 import qualified Control.Monad.State.Lazy as LazyState
 import qualified Control.Monad.RWS.Lazy as LazyRWS
@@ -31,28 +28,27 @@ import qualified Control.Monad.RWS.Strict as StrictRWS
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.Except
-import Control.Monad.Morph
-import Data.DList (DList)
 import Data.Map (Map)
+import Data.IORef
 import Data.String
-import qualified Data.DList as DList
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import qualified Data.Vector as V
 import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString as BS
-import Data.Functor.Identity
 import LLVM.Codegen.IRBuilder.Monad
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Codegen.Name
 import LLVM.Codegen.Flag
 import LLVM.Codegen.NameSupply
+import qualified LLVM.Codegen.ArrayList as L
 import LLVM.Codegen.IR
 import LLVM.Pretty
 
 
 newtype Module
-  = Module [Definition]
+  = Module (V.Vector Definition)
 
 data ParameterName
   = ParameterName !T.Text
@@ -85,61 +81,29 @@ data Definition
 
 data ModuleBuilderState
   = ModuleBuilderState
-  { definitions :: !(DList Definition)
+  { definitions :: !(L.ArrayList Definition)
   , types :: !(Map Name Type)
   , defaultFunctionAttributes :: ![FunctionAttribute]
   }
 
-newtype ModuleBuilderT m a
-  = ModuleBuilderT { unModuleBuilderT :: StateT ModuleBuilderState m a }
-  deriving ( Functor, Applicative, Monad, MonadFix, MonadIO
-           , MonadError e
-           )
-  via StateT ModuleBuilderState m
+newtype ModuleBuilder a
+  = ModuleBuilder (ReaderT (IORef ModuleBuilderState) IO a)
+  deriving (Functor, Applicative, Monad, MonadFix, MonadIO)
+  via ReaderT (IORef ModuleBuilderState) IO
 
-type ModuleBuilder = ModuleBuilderT Identity
+class MonadIO m => MonadModuleBuilder m where
+  getModuleBuilderStateRef :: m (IORef ModuleBuilderState)
 
-instance MonadTrans ModuleBuilderT where
-  lift = ModuleBuilderT . lift
-  {-# INLINEABLE lift #-}
-
-instance MonadReader r m => MonadReader r (ModuleBuilderT m) where
-  ask = lift ask
-  {-# INLINEABLE ask #-}
-  local = mapModuleBuilderT . local
-  {-# INLINEABLE local #-}
-
-mapModuleBuilderT :: (Functor m, Monad n) => (m a -> n a) -> ModuleBuilderT m a -> ModuleBuilderT n a
-mapModuleBuilderT f (ModuleBuilderT inner) =
-  ModuleBuilderT $ do
-    s <- LazyState.get
-    LazyState.mapStateT (g s) inner
-  where
-    g s = fmap (,s) . f . fmap fst
-{-# INLINEABLE mapModuleBuilderT #-}
-
-instance MonadState s m => MonadState s (ModuleBuilderT m) where
-  state = lift . LazyState.state
-  {-# INLINEABLE state #-}
-
-instance MFunctor ModuleBuilderT where
-  hoist nat = ModuleBuilderT . hoist nat . unModuleBuilderT
-  {-# INLINEABLE hoist #-}
-
-class Monad m => MonadModuleBuilder m where
-  liftModuleBuilderState :: State ModuleBuilderState a -> m a
-
-  default liftModuleBuilderState
+  default getModuleBuilderStateRef
     :: (MonadTrans t, MonadModuleBuilder m1, m ~ t m1)
-    => State ModuleBuilderState a
-    -> m a
-  liftModuleBuilderState = lift . liftModuleBuilderState
-  {-# INLINEABLE liftModuleBuilderState #-}
+    => m (IORef ModuleBuilderState)
+  getModuleBuilderStateRef =
+    lift getModuleBuilderStateRef
+  {-# INLINEABLE getModuleBuilderStateRef #-}
 
-instance Monad m => MonadModuleBuilder (ModuleBuilderT m) where
-  liftModuleBuilderState (StateT s) =
-    ModuleBuilderT $ StateT $ pure . runIdentity . s
-  {-# INLINEABLE liftModuleBuilderState #-}
+instance MonadModuleBuilder ModuleBuilder where
+  getModuleBuilderStateRef = ModuleBuilder ask
+  {-# INLINEABLE getModuleBuilderStateRef #-}
 
 instance MonadModuleBuilder m => MonadModuleBuilder (IRBuilderT m)
 instance MonadModuleBuilder m => MonadModuleBuilder (StrictState.StateT s m)
@@ -150,41 +114,48 @@ instance MonadModuleBuilder m => MonadModuleBuilder (ReaderT r m)
 instance (MonadModuleBuilder m, Monoid w) => MonadModuleBuilder (WriterT w m)
 instance MonadModuleBuilder m => MonadModuleBuilder (ExceptT e m)
 
-runModuleBuilderT :: Monad m => ModuleBuilderT m a -> m Module
-runModuleBuilderT (ModuleBuilderT m) =
-  Module . DList.toList . definitions <$> execStateT m beginState
-  where
-    beginState = ModuleBuilderState mempty mempty []
-{-# INLINEABLE runModuleBuilderT #-}
+getModuleBuilderState :: MonadModuleBuilder m => m ModuleBuilderState
+getModuleBuilderState = do
+  ref <- getModuleBuilderStateRef
+  liftIO $ readIORef ref
+{-# INLINE getModuleBuilderState #-}
+
+setModuleBuilderState :: MonadModuleBuilder m => (ModuleBuilderState -> ModuleBuilderState) -> m ()
+setModuleBuilderState f = do
+  ref <- getModuleBuilderStateRef
+  liftIO $ modifyIORef' ref f
+{-# INLINE setModuleBuilderState #-}
+
+runModuleBuilder :: ModuleBuilder a -> IO Module
+runModuleBuilder (ModuleBuilder m) =
+  Module <$> do
+    defs <- L.new 10  -- start with 10 pre-allocated definitions
+    ref <- newIORef $ ModuleBuilderState defs mempty mempty
+    _ <- runReaderT m ref
+    L.toVector . definitions =<< readIORef ref
+{-# INLINEABLE runModuleBuilder #-}
 
 withFunctionAttributes
   :: MonadModuleBuilder m
   => ([FunctionAttribute] -> [FunctionAttribute])
   -> m a -> m a
 withFunctionAttributes f m = do
-  fnAttrs <- liftModuleBuilderState (gets defaultFunctionAttributes)
-  liftModuleBuilderState $
-    modify $ \s -> s { defaultFunctionAttributes = f fnAttrs }
+  fnAttrs <- defaultFunctionAttributes <$> getModuleBuilderState
+  setModuleBuilderState $ \s -> s { defaultFunctionAttributes = f fnAttrs }
   result <- m
-  liftModuleBuilderState $
-    modify $ \s -> s { defaultFunctionAttributes = fnAttrs }
+  setModuleBuilderState $ \s -> s { defaultFunctionAttributes = fnAttrs }
   pure result
 {-# INLINEABLE withFunctionAttributes #-}
 
 resetFunctionAttributes :: MonadModuleBuilder m => m ()
-resetFunctionAttributes =
-  liftModuleBuilderState $
-    modify $ \s -> s { defaultFunctionAttributes = mempty }
+resetFunctionAttributes = do
+  setModuleBuilderState $ \s -> s { defaultFunctionAttributes = mempty }
 {-# INLINEABLE resetFunctionAttributes #-}
 
 getDefaultFunctionAttributes :: MonadModuleBuilder m => m [FunctionAttribute]
-getDefaultFunctionAttributes =
-  liftModuleBuilderState $ gets defaultFunctionAttributes
+getDefaultFunctionAttributes = do
+  defaultFunctionAttributes <$> getModuleBuilderState
 {-# INLINEABLE getDefaultFunctionAttributes #-}
-
-runModuleBuilder :: ModuleBuilder a -> Module
-runModuleBuilder = runIdentity . runModuleBuilderT
-{-# INLINEABLE runModuleBuilder #-}
 
 function :: (HasCallStack, MonadModuleBuilder m)
          => Name -> [(Type, ParameterName)] -> Type -> ([Operand] -> IRBuilderT m a) -> m Operand
@@ -197,31 +168,32 @@ function name args retTy fnBody = do
     _ <- fnBody operands
     pure names
 
-  liftModuleBuilderState $
-    modify $ \s -> s { defaultFunctionAttributes = fnAttrs }
+  setModuleBuilderState $ \s -> s { defaultFunctionAttributes = fnAttrs }
   let args' = zipWith (\argName (ty, _) -> (ty, ParameterName $ unName argName)) names args
   emitDefinition $ GlobalDefinition $ Function name retTy args' fnAttrs instrs
   pure $ ConstantOperand $ GlobalRef (ptr (FunctionType retTy $ map fst args)) name
 {-# INLINEABLE function #-}
 
 emitDefinition :: MonadModuleBuilder m => Definition -> m ()
-emitDefinition def =
-  liftModuleBuilderState $ modify $ \s -> s { definitions = DList.snoc (definitions s) def }
+emitDefinition def = do
+  defs <- definitions <$> getModuleBuilderState
+  defs' <- liftIO $ L.append def defs
+  setModuleBuilderState $ \s -> s { definitions = defs' }
 {-# INLINEABLE emitDefinition #-}
 
 getTypedefs :: MonadModuleBuilder m => m (Map Name Type)
 getTypedefs =
-  liftModuleBuilderState $ gets types
+  types <$> getModuleBuilderState
 {-# INLINEABLE getTypedefs #-}
 
 lookupType :: MonadModuleBuilder m => Name -> m (Maybe Type)
-lookupType name =
-  liftModuleBuilderState $ gets (Map.lookup name . types)
+lookupType name = do
+  Map.lookup name . types <$> getModuleBuilderState
 {-# INLINEABLE lookupType #-}
 
 addType :: MonadModuleBuilder m => Name -> Type -> m ()
-addType name ty =
-  liftModuleBuilderState $ modify $ \s -> s { types = Map.insert name ty (types s) }
+addType name ty = do
+  setModuleBuilderState $ \s -> s { types = Map.insert name ty (types s) }
 {-# INLINEABLE addType #-}
 
 global :: MonadModuleBuilder m => Name -> Type -> Constant -> m Operand
@@ -283,7 +255,7 @@ mkOperand ty paramName = do
 
 renderModule :: Renderer Module
 renderModule buf (Module defs) =
-  sepBy "\n\n"# buf defs renderDefinition
+  sepBy "\n\n"# buf (V.toList defs) renderDefinition
 {-# INLINEABLE renderModule #-}
 
 renderDefinition :: Renderer Definition

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables, MultiParamTypeClasses, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, ScopedTypeVariables, MultiParamTypeClasses, UndecidableInstances, UnboxedTuples #-}
 
 module LLVM.Codegen.NameSupply
   ( Name(..)

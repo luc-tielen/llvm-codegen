@@ -16,6 +16,7 @@ dependencies:
   - text == 2.*
   - bytestring == 0.11.*
   - containers == 0.*
+  - vector == 0.13.*
   - mtl == 2.*
   - dlist == 1.*
   - mmorph == 1.1.5

@@ -28,6 +28,7 @@ library
       LLVM.C.API
       LLVM.C.Bindings
       LLVM.Codegen
+      LLVM.Codegen.ArrayList
       LLVM.Codegen.Flag
       LLVM.Codegen.IR
       LLVM.Codegen.IRBuilder
@@ -74,6 +75,7 @@ library
     , mtl ==2.*
     , text ==2.*
     , text-builder-linear ==0.*
+    , vector ==0.13.*
   default-language: Haskell2010
 
 test-suite llvm-codegen-test
@@ -122,4 +124,5 @@ test-suite llvm-codegen-test
     , neat-interpolation ==0.*
     , text ==2.*
     , text-builder-linear ==0.*
+    , vector ==0.13.*
   default-language: Haskell2010
