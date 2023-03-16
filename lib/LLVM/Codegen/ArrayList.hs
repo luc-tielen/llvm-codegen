@@ -3,7 +3,7 @@ module LLVM.Codegen.ArrayList
   , new
   , append
   , toVector
-  , toVectorCopy
+  , isEmpty
   ) where
 
 import qualified Data.Vector.Mutable as MV
@@ -43,7 +43,6 @@ toVector (ArrayList pos vec) =
   V.take (max 0 (pos - 1)) <$> V.unsafeFreeze vec
 {-# INLINE toVector #-}
 
-toVectorCopy :: ArrayList a -> IO (V.Vector a)
-toVectorCopy (ArrayList pos vec) =
-  V.take (max 0 (pos - 1)) <$> V.freeze vec
-{-# INLINE toVectorCopy #-}
+isEmpty :: ArrayList a -> Bool
+isEmpty (ArrayList pos _) = pos == 0
+{-# INLINE isEmpty #-}

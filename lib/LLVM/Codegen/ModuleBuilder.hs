@@ -66,8 +66,7 @@ data FunctionAttribute
 
 data Global
   = GlobalVariable !Name !Type !Constant
-  | Function !Name !Type ![(Type, ParameterName)] ![FunctionAttribute] ![BasicBlock]
-  deriving Show
+  | Function !Name !Type ![(Type, ParameterName)] ![FunctionAttribute] !(V.Vector BasicBlock)
 
 data Typedef
   = Opaque
@@ -77,7 +76,6 @@ data Typedef
 data Definition
   = GlobalDefinition !Global
   | TypeDefinition !Name !Typedef
-  deriving Show
 
 data ModuleBuilderState
   = ModuleBuilderState
@@ -239,7 +237,7 @@ extern :: MonadModuleBuilder m => Name -> [Type] -> Type -> m Operand
 extern name argTys retTy = do
   let args = [(argTy, ParameterName "") | argTy <- argTys]
   fnAttrs <- getDefaultFunctionAttributes
-  emitDefinition $ GlobalDefinition $ Function name retTy args fnAttrs []
+  emitDefinition $ GlobalDefinition $ Function name retTy args fnAttrs mempty
   let fnTy = ptr $ FunctionType retTy argTys
   pure $ ConstantOperand $ GlobalRef fnTy name
 {-# INLINEABLE extern #-}
@@ -280,7 +278,7 @@ renderGlobal buf = \case
         |># (if null attrs then ""# else " "#)) attrs renderFunctionAttr
     | otherwise ->
       vsep (hsep (tupled ((((buf |># "define external ccc "#) `renderType` retTy) |># " @"#) `renderName` name) (zip [0..] args) renderArg |>. ' ') attrs renderFunctionAttr
-        |># (if null attrs then "{\n"# else " {\n"#)) body renderBasicBlock |># "\n}"#
+        |># (if null attrs then "{\n"# else " {\n"#)) (V.toList body) renderBasicBlock |># "\n}"#
     where
       argTys = map fst args
       renderArg :: Renderer (Int, (Type, ParameterName))

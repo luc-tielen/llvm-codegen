@@ -11,7 +11,6 @@ module LLVM.Codegen.IRBuilder
   , emitTerminator
   , BasicBlock(..)
   , runIRBuilderT
-  , runIRBuilder
   , MonadIRBuilder(..)
 
   , add
