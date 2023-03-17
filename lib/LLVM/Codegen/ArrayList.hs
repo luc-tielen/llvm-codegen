@@ -39,8 +39,8 @@ grow (ArrayList pos vec) = do
 {-# INLINE grow #-}
 
 toVector :: ArrayList a -> IO (V.Vector a)
-toVector (ArrayList pos vec) =
-  V.take (max 0 (pos - 1)) <$> V.unsafeFreeze vec
+toVector (ArrayList pos vec) = do
+  V.take pos <$> V.unsafeFreeze vec
 {-# INLINE toVector #-}
 
 isEmpty :: ArrayList a -> Bool

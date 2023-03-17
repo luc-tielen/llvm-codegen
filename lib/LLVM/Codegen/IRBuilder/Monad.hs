@@ -45,7 +45,7 @@ data BasicBlock
   { bbName :: !Name
   , bbInstructions :: !(V.Vector (Maybe Operand, IR))
   , bbTerminator :: !Terminator
-  }
+  } deriving Show
 
 data PartialBlock
   = PartialBlock

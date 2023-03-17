@@ -15,8 +15,9 @@ import LLVM.Codegen
 
 checkIR :: ModuleBuilder a -> Text -> IO ()
 checkIR llvmModule expectedOutput = do
-  let ir = ppllvm $ runModuleBuilder llvmModule
-  ir `shouldBe` expectedOutput
+  llvmIR <- runModuleBuilder llvmModule
+  let prettyIR = ppllvm llvmIR
+  prettyIR `shouldBe` expectedOutput
 
 spec :: Spec
 spec = describe "constructing LLVM IR" $ do
@@ -75,6 +76,18 @@ spec = describe "constructing LLVM IR" $ do
       %my_opaque_type = type opaque
       |]
 
+  it "supports out of order type definitions" $ do
+    let ir = mdo
+          let myType = ArrayType 10 i16
+          s <- typedef "other_type" Off [ptr myType']
+          myType' <- typedef "my_type" Off [myType, myType]
+          pure ()
+    checkIR ir [text|
+      %other_type = type {%my_type*}
+
+      %my_type = type {[10 x i16], [10 x i16]}
+      |]
+
   it "supports external definitions" $ do
     let ir = do
           _ <- extern "symbol1" [i32, i64] (ptr i8)
@@ -118,6 +131,19 @@ spec = describe "constructing LLVM IR" $ do
         %0 = add i32 %a_0, %b_0
         ret i32 %0
       }
+      |]
+
+  fit "renders mutual recursive functions" $ do
+    let ir = mdo
+          f1 <- function "f1" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> do
+            c <- call f2 [a, b]
+            ret c
+          f2 <- function "f2" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> do
+            -- c <- call f1 [a, b]
+            -- ret c
+            ret $ int32 0
+          pure ()
+    checkIR ir [text|
       |]
 
   -- IR level

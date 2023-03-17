@@ -121,7 +121,7 @@ getModuleBuilderState = do
 setModuleBuilderState :: MonadModuleBuilder m => (ModuleBuilderState -> ModuleBuilderState) -> m ()
 setModuleBuilderState f = do
   ref <- getModuleBuilderStateRef
-  liftIO $ modifyIORef' ref f
+  liftIO $ modifyIORef ref f
 {-# INLINE setModuleBuilderState #-}
 
 runModuleBuilder :: ModuleBuilder a -> IO Module

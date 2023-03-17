@@ -12,8 +12,9 @@ import NeatInterpolation
 
 checkIR :: ModuleBuilder a -> Text -> IO ()
 checkIR llvmModule expectedOutput = do
-  let ir = ppllvm $ runModuleBuilder llvmModule
-  ir `shouldBe` expectedOutput
+  llvmIR <- runModuleBuilder llvmModule
+  let prettyIR = ppllvm llvmIR
+  prettyIR `shouldBe` expectedOutput
 
 spec :: Spec
 spec = describe "IR builder combinators" $ parallel $ do
