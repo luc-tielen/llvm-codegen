@@ -53,6 +53,7 @@ data PartialBlock
   { pbName :: !Name
   , pbInstructions :: !(DList (Maybe Operand, IR))
   , pbTerminator :: !(First Terminator)
+  , pbNumInstrs :: !Int
   }
 
 data IRBuilderState
@@ -101,7 +102,7 @@ type IRBuilder = IRBuilderT Identity
 
 runIRBuilderT :: Monad m => IRBuilderT m a -> m (a, [BasicBlock])
 runIRBuilderT (IRBuilderT m) = do
-  let partialBlock = PartialBlock (Name "start") mempty mempty
+  let partialBlock = PartialBlock (Name "start") mempty mempty 0
       result = runNameSupplyT $ runStateT m (IRBuilderState mempty partialBlock)
   fmap (second getBlocks) result
   where
@@ -137,7 +138,7 @@ emitBlockStart :: (MonadNameSupply m, MonadIRBuilder m) => Name -> m ()
 emitBlockStart blockName =
   modifyIRBuilderState $ \s ->
     let currBlock = currentPartialBlock s
-        hasntStartedBlock = null (DList.toList (pbInstructions currBlock)) && isNothing (getFirst (pbTerminator currBlock))
+        hasntStartedBlock = (pbNumInstrs currBlock == 0) && isNothing (getFirst (pbTerminator currBlock))
         blocks = basicBlocks s
         -- If the current block is empty:
         --   Insert a dummy basic block that jumps directly to the next block, to avoid continuity errors.
@@ -152,7 +153,7 @@ emitBlockStart blockName =
             then BB (pbName currBlock) mempty (Terminator $ Br blockName)
             else partialBlockToBasicBlock currBlock
      in s { basicBlocks = DList.snoc blocks newBlock
-          , currentPartialBlock = PartialBlock blockName mempty mempty
+          , currentPartialBlock = PartialBlock blockName mempty mempty 0
           }
 {-# INLINEABLE emitBlockStart #-}
 
@@ -177,7 +178,7 @@ addInstrToCurrentBlock :: MonadIRBuilder m => Maybe Operand -> IR -> m ()
 addInstrToCurrentBlock operand instr =
   modifyCurrentBlock $ \blk ->
     let instrs = DList.snoc (pbInstructions blk) (operand, instr)
-      in blk { pbInstructions = instrs }
+        in blk { pbInstructions = instrs, pbNumInstrs = pbNumInstrs blk + 1 }
 {-# INLINEABLE addInstrToCurrentBlock #-}
 
 emitTerminator :: MonadIRBuilder m => Terminator -> m ()
