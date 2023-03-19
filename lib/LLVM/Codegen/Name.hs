@@ -12,6 +12,7 @@ newtype Name = Name { unName :: Text }
 
 instance IsString Name where
   fromString = Name . fromString
+  {-# INLINABLE fromString #-}
 
 renderName :: Renderer Name
 renderName buf (Name name) =

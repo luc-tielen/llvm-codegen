@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables, MultiParamTypeClasses, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, ScopedTypeVariables, MultiParamTypeClasses, UndecidableInstances, BangPatterns #-}
 
 module LLVM.Codegen.NameSupply
   ( Name(..)
@@ -30,7 +30,7 @@ type Counter = Int
 
 data NameSupplyState
   = NameSupplyState
-  { counter :: !Counter
+  { counter :: {-# UNPACK #-} !Counter
   , nameMap :: !(Map Name Counter)
   }
 
@@ -84,11 +84,11 @@ class Monad m => MonadNameSupply m where
 
   default fresh :: (MonadTrans t, MonadNameSupply m1, m ~ t m1) => m Name
   fresh = lift fresh
-  {-# INLINABLE fresh #-}
+  {-# INLINE fresh #-}
 
   default getSuggestion :: (MonadTrans t, MonadNameSupply m1, m ~ t m1) => m (Maybe Name)
   getSuggestion = lift getSuggestion
-  {-# INLINABLE getSuggestion #-}
+  {-# INLINE getSuggestion #-}
 
 instance Monad m => MonadNameSupply (NameSupplyT m) where
   getSuggestion = NameSupplyT ask
@@ -97,14 +97,16 @@ instance Monad m => MonadNameSupply (NameSupplyT m) where
   fresh = getSuggestion >>= \case
     Nothing -> NameSupplyT $ do
       count <- StrictState.gets counter
-      StrictState.modify $ \s -> s { counter = count + 1 }
-      pure $ Name $ T.pack (show count)
+      let !newCount = count + 1
+      StrictState.modify' $ \s -> s { counter = newCount }
+      pure $! Name $! T.pack (show count)
     Just suggestion -> NameSupplyT $ do
       nameMapping <- StrictState.gets nameMap
       let mCount = M.lookup suggestion nameMapping
-          count = fromMaybe 0 mCount
-      StrictState.modify $ \s -> s { nameMap = M.insert suggestion (count + 1) nameMapping }
-      pure $ Name $ unName suggestion <> "_" <> T.pack (show count)
+          !count = fromMaybe 0 mCount
+          !newMapping = M.insert suggestion (count + 1) nameMapping
+      StrictState.modify' $ \s -> s { nameMap = newMapping }
+      pure $! Name $ unName suggestion <> "_" <> T.pack (show count)
   {-# INLINABLE fresh #-}
 
   m `named` name =
