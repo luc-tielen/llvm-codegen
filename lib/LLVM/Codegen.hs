@@ -1,7 +1,6 @@
 module LLVM.Codegen
   ( module LLVM.Codegen.IRBuilder
   , module LLVM.Codegen.ModuleBuilder
-  , module LLVM.Codegen.NameSupply
   , module LLVM.Codegen.Type
   , module LLVM.Codegen.Operand
   , module LLVM.Codegen.IR
@@ -9,7 +8,6 @@ module LLVM.Codegen
   , ppllvm
   ) where
 
-import LLVM.Codegen.NameSupply
 import LLVM.Codegen.IRBuilder
 import LLVM.Codegen.ModuleBuilder
 import LLVM.Codegen.Type

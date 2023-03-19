@@ -46,7 +46,6 @@ import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Codegen.Name
 import LLVM.Codegen.Flag
-import LLVM.Codegen.NameSupply
 import LLVM.Codegen.IR
 import LLVM.Pretty
 
@@ -230,7 +229,7 @@ global name ty constant = do
   pure $ ConstantOperand $ GlobalRef (ptr ty) name
 {-# INLINEABLE global #-}
 
-globalUtf8StringPtr :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+globalUtf8StringPtr :: (HasCallStack, MonadModuleBuilder m, MonadIRBuilder m)
                     => T.Text -> Name -> m Operand
 globalUtf8StringPtr txt name = do
   let utf8Bytes = BS.snoc (TE.encodeUtf8 txt) 0  -- 0-terminated UTF8 string
@@ -276,8 +275,8 @@ extern name argTys retTy = do
 mkOperand :: Monad m => Type -> ParameterName -> IRBuilderT m (Name, Operand)
 mkOperand ty paramName = do
   name <- case paramName of
-    NoParameterName -> fresh
-    ParameterName name -> fresh `named` Name name
+    NoParameterName -> freshName Nothing
+    ParameterName name -> freshName (Just name)
   pure (name, LocalRef ty name)
 {-# INLINEABLE mkOperand #-}
 

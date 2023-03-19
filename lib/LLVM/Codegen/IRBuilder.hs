@@ -4,7 +4,6 @@ module LLVM.Codegen.IRBuilder
   ( IRBuilderT
   , IRBuilder
   , block
-  , named
   , emitBlockStart
   , emitInstr
   , emitInstrVoid
@@ -74,7 +73,7 @@ import Control.Monad.Fix
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Word
-import LLVM.Codegen.NameSupply
+import LLVM.Codegen.Name
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Codegen.IR
@@ -84,58 +83,58 @@ import LLVM.Codegen.ModuleBuilder
 
 -- Helpers for generating instructions:
 
-add :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
+add :: (MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 add lhs rhs =
   emitInstr (typeOf lhs) $ Add Off Off lhs rhs
 {-# INLINEABLE add #-}
 
-mul :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
+mul :: (MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 mul lhs rhs =
   emitInstr (typeOf lhs) $ Mul Off Off lhs rhs
 {-# INLINEABLE mul #-}
 
-sub :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
+sub :: (MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 sub lhs rhs =
   emitInstr (typeOf lhs) $ Sub Off Off lhs rhs
 {-# INLINEABLE sub #-}
 
-udiv :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
+udiv :: (MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 udiv lhs rhs =
   emitInstr (typeOf lhs) $ Udiv Off lhs rhs
 {-# INLINEABLE udiv #-}
 
-and :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
+and :: (MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 and lhs rhs =
   emitInstr (typeOf lhs) $ And lhs rhs
 {-# INLINEABLE and #-}
 
-trunc :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
+trunc :: (MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
 trunc val ty =
   emitInstr ty $ Trunc val ty
 {-# INLINEABLE trunc #-}
 
-zext :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
+zext :: (MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
 zext val ty =
   emitInstr ty $ Zext val ty
 {-# INLINEABLE zext #-}
 
-ptrtoint :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
+ptrtoint :: (MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
 ptrtoint val ty =
   emitInstr ty $ PtrToInt val ty
 {-# INLINEABLE ptrtoint #-}
 
-bitcast :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
+bitcast :: (MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
 bitcast val ty =
   emitInstr ty $ Bitcast val ty
 {-# INLINEABLE bitcast #-}
 
-icmp :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => ComparisonType -> Operand -> Operand -> m Operand
+icmp :: (MonadIRBuilder m, HasCallStack) => ComparisonType -> Operand -> Operand -> m Operand
 icmp cmp a b =
   emitInstr i1 $ ICmp cmp a b
 {-# INLINEABLE icmp #-}
 
 eq, ne, sge, sgt, sle, slt, uge, ugt, ule, ult
-  :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
+  :: (MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 eq = icmp EQ
 ne = icmp NE
 sge = icmp SGE
@@ -157,12 +156,12 @@ ult = icmp ULT
 {-# INLINABLE ule #-}
 {-# INLINABLE ult #-}
 
-alloca :: (MonadNameSupply m, MonadIRBuilder m, HasCallStack) => Type -> Maybe Operand -> Int -> m Operand
+alloca :: (MonadIRBuilder m, HasCallStack) => Type -> Maybe Operand -> Int -> m Operand
 alloca ty numElems alignment =
   emitInstr (ptr ty) $ Alloca ty numElems alignment
 {-# INLINEABLE alloca #-}
 
-gep :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+gep :: (HasCallStack, MonadModuleBuilder m, MonadIRBuilder m)
     => Operand -> [Operand] -> m Operand
 gep operand indices = do
   resultType <- computeGepType (typeOf operand) indices
@@ -188,7 +187,7 @@ computeGepType ty _ =
   pure $ Left $ "Expecting aggregate type. (Malformed AST): " <> show ty
 {-# INLINEABLE computeGepType #-}
 
-load :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m) => Operand -> Alignment -> m Operand
+load :: (HasCallStack, MonadIRBuilder m) => Operand -> Alignment -> m Operand
 load address align =
   case typeOf address of
     PointerType ty ->
@@ -202,7 +201,7 @@ store address align value =
   emitInstrVoid $ Store Off address value Nothing align
 {-# INLINEABLE store #-}
 
-phi :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m) => [(Operand, Name)] -> m Operand
+phi :: (HasCallStack, MonadIRBuilder m) => [(Operand, Name)] -> m Operand
 phi cases
   | null cases = error "phi instruction should always have > 0 cases!"
   | otherwise =
@@ -211,7 +210,7 @@ phi cases
      in emitInstr ty $ Phi neCases
 {-# INLINEABLE phi #-}
 
-call :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m) => Operand -> [Operand] -> m Operand
+call :: (HasCallStack, MonadIRBuilder m) => Operand -> [Operand] -> m Operand
 call fn args = case typeOf fn of
   FunctionType retTy _->
     emitCallInstr retTy
@@ -252,45 +251,45 @@ switch value defaultDest dests =
   emitTerminator $ Terminator $ Switch value defaultDest dests
 {-# INLINEABLE switch #-}
 
-select :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m) => Operand -> Operand -> Operand -> m Operand
+select :: (HasCallStack, MonadIRBuilder m) => Operand -> Operand -> Operand -> m Operand
 select c t f =
   emitInstr (typeOf t) $ Select c t f
 {-# INLINEABLE select #-}
 
-if' :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m, MonadFix m)
+if' :: (HasCallStack, MonadIRBuilder m, MonadFix m)
     => Operand -> m a -> m ()
 if' condition asm = mdo
   condBr condition ifBlock end
-  ifBlock <- block `named` "if"
+  ifBlock <- blockNamed "if"
   _ <- asm
   br end
-  end <- block `named` "end_if"
+  end <- blockNamed "end_if"
   pure ()
 {-# INLINEABLE if' #-}
 
-loop :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m, MonadFix m) => m a -> m ()
+loop :: (HasCallStack, MonadIRBuilder m, MonadFix m) => m a -> m ()
 loop asm = mdo
   br begin
-  begin <- block `named` "loop"
+  begin <- blockNamed "loop"
   _ <- asm
   br begin
 {-# INLINEABLE loop #-}
 
-loopWhile :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m, MonadFix m)
+loopWhile :: (HasCallStack, MonadIRBuilder m, MonadFix m)
           => m Operand -> m a -> m ()
 loopWhile condition asm = mdo
   br begin
-  begin <- block `named` "while_begin"
+  begin <- blockNamed "while_begin"
   result <- condition
   condBr result body end
-  body <- block `named` "while_body"
+  body <- blockNamed "while_body"
   _ <- asm
   br begin
-  end <- block `named` "while_end"
+  end <- blockNamed "while_end"
   pure ()
 {-# INLINEABLE loopWhile #-}
 
-loopFor :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, MonadFix m)
+loopFor :: (HasCallStack, MonadModuleBuilder m, MonadIRBuilder m, MonadFix m)
         => Operand
         -> (Operand -> m Operand)
         -> (Operand -> m Operand)
@@ -299,21 +298,21 @@ loopFor :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilde
 loopFor beginValue condition post asm = mdo
   start <- currentBlock
   br begin
-  begin <- block `named` "for_begin"
+  begin <- blockNamed "for_begin"
   loopValue <- phi [(beginValue, start), (updatedValue, bodyEnd)]
   result <- condition loopValue
   condBr result bodyStart end
-  bodyStart <- block `named` "for_body"
+  bodyStart <- blockNamed "for_body"
   _ <- asm loopValue
   updatedValue <- post loopValue
   bodyEnd <- currentBlock
   br begin
-  end <- block `named` "for_end"
+  end <- blockNamed "for_end"
   pure ()
 {-# INLINEABLE loopFor #-}
 
 -- NOTE: diff is in bytes! (Different compared to C and C++)
-pointerDiff :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m)
+pointerDiff :: (HasCallStack, MonadIRBuilder m)
             => Type -> Operand -> Operand -> m Operand
 pointerDiff ty a b = do
   a' <- ptrtoint a i64
@@ -325,7 +324,7 @@ pointerDiff ty a b = do
 -- | Calculates the logical not of a boolean 'Operand'.
 --   NOTE: This assumes the 'Operand' is of type 'i1', this is not checked!
 --   Passing in an argument of another width will lead to a crash in LLVM.
-not' :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m)
+not' :: (HasCallStack, MonadIRBuilder m)
      => Operand -> m Operand
 not' bool =
   select bool (bit 0) (bit 1)
@@ -334,7 +333,7 @@ not' bool =
 data Signedness = Signed | Unsigned
 
 --   NOTE: No check is made if the 2 operands have the same 'Type'!
-minimum' :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m)
+minimum' :: (HasCallStack, MonadIRBuilder m)
          => Signedness -> Operand -> Operand -> m Operand
 minimum' sign a b = do
   let inst = case sign of
@@ -344,7 +343,7 @@ minimum' sign a b = do
   select isLessThan a b
 {-# INLINEABLE minimum' #-}
 
-allocate :: (HasCallStack, MonadNameSupply m, MonadIRBuilder m) => Type -> Operand -> m Operand
+allocate :: (HasCallStack, MonadIRBuilder m) => Type -> Operand -> m Operand
 allocate ty beginValue = do
   value <- alloca ty Nothing 0
   store value 0 beginValue
@@ -366,7 +365,7 @@ Path a2b ->> Path b2c =
                else NE.toList b2c
    in Path $ NE.head a2b :| (NE.tail a2b ++ b2c')
 
-addr :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
+addr :: (MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
      => Path a b -> Operand -> m Operand
 addr path p = gep p (pathToIndices path)
   where
@@ -375,21 +374,21 @@ addr path p = gep p (pathToIndices path)
       NE.toList indices
 {-# INLINEABLE addr #-}
 
-deref :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
+deref :: (MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
       => Path a b -> Operand -> m Operand
 deref path p = do
   address <- addr path p
   load address 0
 {-# INLINEABLE deref #-}
 
-assign :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
+assign :: (MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
        => Path a b -> Operand -> Operand -> m ()
 assign path p value = do
   dstAddr <- addr path p
   store dstAddr 0 value
 {-# INLINEABLE assign #-}
 
-update :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
+update :: (MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
        => Path a b
        -> Operand
        -> (Operand -> m Operand)
@@ -399,20 +398,20 @@ update path p f = do
   store dstAddr 0 =<< f =<< load dstAddr 0
 {-# INLINEABLE update #-}
 
-increment :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
+increment :: (MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
           => (Integer -> Operand) -> Path a b -> Operand -> m ()
 increment ty path p =
   update path p (add (ty 1))
 {-# INLINEABLE increment #-}
 
-copy :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
+copy :: (MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
      => Path a b -> Operand -> Operand -> m ()
 copy path src dst = do
   value <- deref path src
   assign path dst value
 {-# INLINEABLE copy #-}
 
-swap :: (MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
+swap :: (MonadModuleBuilder m, MonadIRBuilder m, HasCallStack)
      => Path a b -> Operand -> Operand -> m ()
 swap path lhs rhs = do
   tmp <- deref path lhs

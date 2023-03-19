@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, RankNTypes, MultiParamTypeClasses, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, RankNTypes, MultiParamTypeClasses, UndecidableInstances, BangPatterns #-}
 
 module LLVM.Codegen.IRBuilder.Monad
   ( IRBuilderT
@@ -8,12 +8,13 @@ module LLVM.Codegen.IRBuilder.Monad
   , MonadIRBuilder(..)
   , BasicBlock(..)
   , block
+  , blockNamed
   , emitBlockStart
-  , named
   , emitInstr
   , emitInstrVoid
   , emitTerminator
   , renderBasicBlock
+  , freshName
   ) where
 
 -- NOTE: this module only exists to solve a cyclic import
@@ -30,10 +31,12 @@ import Control.Monad.Writer
 import Control.Monad.Except
 import Control.Monad.Morph
 import Data.Functor.Identity
+import qualified Data.Text as T
 import qualified Data.DList as DList
 import Data.DList (DList)
+import qualified Data.Map as M
+import Data.Map (Map)
 import Data.Maybe
-import LLVM.Codegen.NameSupply
 import LLVM.Codegen.Operand
 import LLVM.Codegen.IR
 import LLVM.Codegen.Type
@@ -60,14 +63,16 @@ data IRBuilderState
   = IRBuilderState
   { basicBlocks :: !(DList BasicBlock)
   , currentPartialBlock :: !PartialBlock
+  , operandCounter :: !Int
+  , nameMap :: !(Map T.Text Int)
   }
 
 newtype IRBuilderT m a
-  = IRBuilderT { unIRBuilderT :: StateT IRBuilderState (NameSupplyT m) a }
+  = IRBuilderT { unIRBuilderT :: StateT IRBuilderState m a }
   deriving ( Functor, Applicative, Monad, MonadFix, MonadIO
-           , MonadNameSupply, MonadError e
+           , MonadError e
            )
-  via StateT IRBuilderState (NameSupplyT m)
+  via StateT IRBuilderState m
 
 instance MonadReader r m => MonadReader r (IRBuilderT m) where
   ask = lift ask
@@ -81,7 +86,7 @@ mapIRBuilderT :: (Monad m, Monad n) => (m a -> n a) -> IRBuilderT m a -> IRBuild
 mapIRBuilderT f (IRBuilderT inner) =
   IRBuilderT $ do
     s <- LazyState.get
-    LazyState.mapStateT (mapNameSupplyT $ g s) inner
+    LazyState.mapStateT (g s) inner
   where
     g s = fmap (,s) . f . fmap fst
 {-# INLINEABLE mapIRBuilderT #-}
@@ -91,11 +96,11 @@ instance MonadState s m => MonadState s (IRBuilderT m) where
   {-# INLINEABLE state #-}
 
 instance MonadTrans IRBuilderT where
-  lift = IRBuilderT . lift . lift
+  lift = IRBuilderT . lift
   {-# INLINEABLE lift #-}
 
 instance MFunctor IRBuilderT where
-  hoist nat = IRBuilderT . hoist (hoist nat) . unIRBuilderT
+  hoist nat = IRBuilderT . hoist nat . unIRBuilderT
   {-# INLINEABLE hoist #-}
 
 type IRBuilder = IRBuilderT Identity
@@ -103,7 +108,7 @@ type IRBuilder = IRBuilderT Identity
 runIRBuilderT :: Monad m => IRBuilderT m a -> m (a, [BasicBlock])
 runIRBuilderT (IRBuilderT m) = do
   let partialBlock = PartialBlock (Name "start") mempty mempty 0
-      result = runNameSupplyT $ runStateT m (IRBuilderState mempty partialBlock)
+      result = runStateT m (IRBuilderState mempty partialBlock 0 mempty)
   fmap (second getBlocks) result
   where
     getBlocks irState =
@@ -122,19 +127,21 @@ partialBlockToBasicBlock pb =
   in BB (pbName pb) (pbInstructions pb) currentTerm
 {-# INLINEABLE partialBlockToBasicBlock #-}
 
-block :: (MonadNameSupply m, MonadIRBuilder m) => m Name
+block :: (MonadIRBuilder m) => m Name
 block = do
-  blockName <- getSuggestion >>= \case
-    Nothing -> do
-      fresh `named` "block"
-    Just _sugg ->
-      fresh
-
+  blockName <- freshName Nothing
   emitBlockStart blockName
   pure blockName
 {-# INLINEABLE block #-}
 
-emitBlockStart :: (MonadNameSupply m, MonadIRBuilder m) => Name -> m ()
+blockNamed :: (MonadIRBuilder m) => T.Text -> m Name
+blockNamed blkName = do
+  blockName <- freshName (Just blkName)
+  emitBlockStart blockName
+  pure blockName
+{-# INLINEABLE blockNamed #-}
+
+emitBlockStart :: (MonadIRBuilder m) => Name -> m ()
 emitBlockStart blockName =
   modifyIRBuilderState $ \s ->
     let currBlock = currentPartialBlock s
@@ -158,11 +165,31 @@ emitBlockStart blockName =
 {-# INLINEABLE emitBlockStart #-}
 
 -- NOTE: Only used internally, this creates an unassigned operand
-mkOperand :: (MonadNameSupply m, MonadIRBuilder m) => Type -> m Operand
-mkOperand ty =
-  LocalRef ty <$> fresh
+mkOperand :: (MonadIRBuilder m) => Type -> m Operand
+mkOperand ty = LocalRef ty <$!> freshUnnamed
+{-# INLINEABLE mkOperand #-}
 
-emitInstr :: (MonadNameSupply m, MonadIRBuilder m) => Type -> IR -> m Operand
+freshName :: MonadIRBuilder m => Maybe T.Text -> m Name
+freshName = \case
+  Nothing -> freshUnnamed
+  Just suggestion -> do
+    nameMapping <- nameMap <$> getIRBuilderState
+    let !mCount = M.lookup suggestion nameMapping
+        !count = fromMaybe 0 mCount
+        !newMapping = M.insert suggestion (count + 1) nameMapping
+    modifyIRBuilderState $ \s -> s { nameMap = newMapping }
+    pure $! Name $! suggestion <> "_" <> T.pack (show count)
+{-# INLINEABLE freshName #-}
+
+freshUnnamed :: MonadIRBuilder m => m Name
+freshUnnamed = do
+  !ctr <- operandCounter <$> getIRBuilderState
+  let !newCount = ctr + 1
+  modifyIRBuilderState $ \s -> s { operandCounter = newCount }
+  pure $! Generated ctr
+{-# INLINEABLE freshUnnamed #-}
+
+emitInstr :: (MonadIRBuilder m) => Type -> IR -> m Operand
 emitInstr ty instr = do
   operand <- mkOperand ty
   addInstrToCurrentBlock (Just operand) instr
@@ -194,9 +221,17 @@ modifyCurrentBlock f =
 {-# INLINEABLE modifyCurrentBlock #-}
 
 class Monad m => MonadIRBuilder m where
+  getIRBuilderState :: m IRBuilderState
+
   modifyIRBuilderState :: (IRBuilderState -> IRBuilderState) -> m ()
 
   currentBlock :: m Name
+
+  default getIRBuilderState
+    :: (MonadTrans t, MonadIRBuilder m1, m ~ t m1)
+    => m IRBuilderState
+  getIRBuilderState = lift getIRBuilderState
+  {-# INLINEABLE getIRBuilderState #-}
 
   default modifyIRBuilderState
     :: (MonadTrans t, MonadIRBuilder m1, m ~ t m1)
@@ -208,13 +243,16 @@ class Monad m => MonadIRBuilder m where
   default currentBlock
     :: (MonadTrans t, MonadIRBuilder m1, m ~ t m1)
     => m Name
-  currentBlock =
-    lift currentBlock
+  currentBlock = lift currentBlock
   {-# INLINEABLE currentBlock #-}
 
 instance Monad m => MonadIRBuilder (IRBuilderT m) where
+  getIRBuilderState = IRBuilderT LazyState.get
+  {-# INLINEABLE getIRBuilderState #-}
+
   modifyIRBuilderState = IRBuilderT . modify
   {-# INLINEABLE modifyIRBuilderState #-}
+
   currentBlock =
     IRBuilderT $ LazyState.gets (pbName . currentPartialBlock)
   {-# INLINEABLE currentBlock #-}

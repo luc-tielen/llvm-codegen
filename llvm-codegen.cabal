@@ -34,7 +34,6 @@ library
       LLVM.Codegen.IRBuilder.Monad
       LLVM.Codegen.ModuleBuilder
       LLVM.Codegen.Name
-      LLVM.Codegen.NameSupply
       LLVM.Codegen.Operand
       LLVM.Codegen.Type
       LLVM.Pretty

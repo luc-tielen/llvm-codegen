@@ -91,9 +91,9 @@ mkFunctionType retTy argTys =
     llvmFunctionTypeInContext retTy argTyArray argCount isVarArg
 
 getTypeByName :: ForeignPtr Context -> Name -> IO (Ptr Type)
-getTypeByName ctx (Name name) =
+getTypeByName ctx name =
   withForeignPtr ctx $ \c ->
-    withCString (T.unpack name) $ \str ->
+    withCString (T.unpack $ unName name) $ \str ->
       llvmGetTypeByNameInContext c str
 
 mkContext :: IO (ForeignPtr Context)
