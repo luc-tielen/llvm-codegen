@@ -4,6 +4,7 @@ module LLVM.Codegen.IRBuilder
   ( IRBuilderT
   , IRBuilder
   , block
+  , blockNamed
   , emitBlockStart
   , emitInstr
   , emitInstrVoid
