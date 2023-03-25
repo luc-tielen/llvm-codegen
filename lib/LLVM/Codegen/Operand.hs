@@ -2,6 +2,8 @@ module LLVM.Codegen.Operand
   ( Operand(..)
   , Constant(..)
   , typeOf
+  , renderOperand
+  , renderConstant
   ) where
 
 import LLVM.Codegen.Name
@@ -43,22 +45,26 @@ typeOf = \case
         ty
 {-# INLINEABLE typeOf #-}
 
-instance Pretty Operand where
-  pretty = \case
-    LocalRef _ name ->
-      "%" <> pretty name
-    ConstantOperand c ->
-      pretty c
+renderConstant :: Renderer Constant
+renderConstant buf = \case
+  GlobalRef _ name ->
+    (buf |>. '@') `renderName` name
+  Array ty cs ->
+    brackets buf (\buf' -> commas buf' cs renderValue)
+    where
+      renderValue ::  Renderer Constant
+      renderValue buf' c = (renderType buf' ty  |>. ' ') `renderConstant` c
+  Int _bits x ->
+    buf |>$ (fromInteger x :: Int)
+  NullPtr _ ->
+    buf |># "zeroinitializer"#
+  Undef _ ->
+    buf |># "undef"#
 
-instance Pretty Constant where
-  pretty = \case
-    GlobalRef _ name ->
-      "@" <> pretty name
-    Array ty cs ->
-      brackets $ commas (map (\c -> pretty ty <+> pretty c) cs)
-    Int _bits x ->
-      pretty x
-    NullPtr _ ->
-      "zeroinitializer"
-    Undef _ ->
-      "undef"
+renderOperand :: Renderer Operand
+renderOperand buf = \case
+  LocalRef _ name ->
+    (buf |>. '%') `renderName` name
+  ConstantOperand c ->
+    renderConstant buf c
+{-# INLINEABLE renderOperand #-}

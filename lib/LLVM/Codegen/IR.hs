@@ -13,6 +13,7 @@ module LLVM.Codegen.IR
   , Exact
   , Inbounds
   , Volatile
+  , renderIR
   ) where
 
 import Prelude hiding (EQ)
@@ -21,9 +22,9 @@ import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
 import LLVM.Codegen.Flag
 import LLVM.Pretty
-import Data.Maybe
 import Data.Word
-import Data.List.NonEmpty (NonEmpty(..), toList)
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 
 
 data NUW
@@ -104,154 +105,176 @@ newtype Terminator
   = Terminator IR
   deriving Show
 
-instance Pretty IR where
-  pretty = \case
-    Add nuw nsw a b ->
-      prettyArithBinOp "add" nuw nsw a b
-    Mul nuw nsw a b ->
-      prettyArithBinOp "mul" nuw nsw a b
-    Sub nuw nsw a b ->
-      prettyArithBinOp "sub" nuw nsw a b
-    Udiv exact a b ->
-      "udiv" <+> optional exact "exact" <> pretty (typeOf a) <+> pretty a <> "," <+> pretty b
-    And a b ->
-      "and" <+> pretty (typeOf a) <+> pretty a <> "," <+> pretty b
-    Trunc val to ->
-      prettyConvertOp "trunc" val to
-    Zext val to ->
-      prettyConvertOp "zext" val to
-    Bitcast val to ->
-      prettyConvertOp "bitcast" val to
-    ICmp cmp a b ->
-      "icmp" <+> pretty cmp <+> pretty (typeOf a) <+> pretty a <> "," <+> pretty b
-    PtrToInt val to ->
-      prettyConvertOp "ptrtoint" val to
-    Alloca ty numElems alignment ->
-      mconcat $ catMaybes [ Just $ "alloca" <+> pretty ty
-                          , (\count -> "," <+> pretty (typeOf count) <+> pretty count) <$> numElems
-                          , if alignment == 0 then Nothing else Just (", align" <+> pretty alignment)
-                          ]
-    GetElementPtr inbounds pointer indices ->
-      case typeOf pointer of
-        ty@(PointerType innerTy) ->
-          "getelementptr" <+> optional inbounds "inbounds" <> pretty innerTy <> "," <+> pretty ty <+>
-            pretty pointer <> "," <+> commas (map prettyIndex indices)
-        _ ->
-          error "Operand given to `getelementptr` that is not a pointer!"
-      where
-        prettyIndex i = pretty (typeOf i) <+> pretty i
-    Load volatile addr atomicity alignment ->
-      let ptrTy = typeOf addr
-          resultTy = case ptrTy of
-            PointerType ty -> ty
-            _ -> error "Malformed AST, expected pointer type."
-          alignDoc = if alignment == 0 then mempty else ", align" <+> pretty alignment
-       in case atomicity of
-            Nothing ->
-              "load" <+> optional volatile "volatile" <> pretty resultTy <> "," <+> pretty ptrTy <+>
-                pretty addr <> alignDoc
-            Just (syncScope, memoryOrdering) ->
-              "load atomic" <+> optional volatile "volatile" <> pretty resultTy <> "," <+> pretty ptrTy <+>
-                pretty addr <+> pretty syncScope <+> pretty memoryOrdering <> alignDoc
-    Store volatile addr value atomicity alignment ->
-      let ty = typeOf value
-          ptrTy = PointerType ty
-          alignDoc = if alignment == 0 then mempty else ", align" <+> pretty alignment
-       in case atomicity of
-            Nothing ->
-              "store" <+> optional volatile "volatile" <> pretty ty <+> pretty value <> "," <+>
-                pretty ptrTy <+> pretty addr <> alignDoc
-            Just (syncScope, memoryOrdering) ->
-              "store atomic" <+> optional volatile "volatile" <> pretty ty <+> pretty value <> "," <+>
-                pretty ptrTy <+> pretty addr <+> pretty syncScope <+> pretty memoryOrdering <> alignDoc
-    Phi cases@((val, _) :| _) ->
-      "phi" <+> pretty (typeOf val) <+> commas (toList $ fmap prettyPhiCase cases)
-      where
-        prettyPhiCase (value, name) =
-          brackets $ pretty value <> "," <+> "%" <> pretty name
-    Call tcAttr cc fn args ->
-      tcDoc <> "call" <+> pretty cc <+> pretty resultType <+> pretty fn <> prettyArgs
-      where
-        resultType = case typeOf fn of
-          PointerType (FunctionType retTy _) -> retTy
-          FunctionType retTy _ -> retTy
-          _ -> error "Malformed AST, expected function type."
-        tcDoc = maybeDoc tcAttr (\tc -> pretty tc <> " ")
-        prettyArgs = parens $ commas $ map prettyArg args
-        prettyArg arg =
-          pretty (typeOf arg) <+> pretty arg
-    Ret term ->
-      case term of
-        Nothing ->
-          "ret void"
-        Just operand ->
-          "ret " <> pretty (typeOf operand) <+> pretty operand
-    Br blockName ->
-      "br label" <+> "%" <> pretty blockName
-    CondBr cond trueLabel falseLabel ->
-      "br i1" <+> pretty cond <> ", label" <+> "%" <> pretty trueLabel <> ", label" <+> "%" <> pretty falseLabel
-    Switch val defaultLabel cases ->
-      "switch" <+> pretty (typeOf val) <+> pretty val <> "," <+> "label" <+> "%" <> pretty defaultLabel <+>
-        brackets (sep (map prettyCase cases))
-      where
-        prettyCase (caseVal, label) =
-          pretty (typeOf caseVal) <+> pretty caseVal <> ", label" <+> "%" <> pretty label
-    Select c t f ->
-      "select" <+> pretty (typeOf c) <+> pretty c <> "," <+>
-        pretty (typeOf t) <+> pretty t <> "," <+>
-        pretty (typeOf f) <+> pretty f
+renderTCA :: Renderer TailCallAttribute
+renderTCA buf = \case
+  Tail -> buf |># "tail"#
+  NoTail -> buf |># "notail"#
+  MustTail -> buf |># "musttail"#
+{-# INLINABLE renderTCA #-}
 
-instance Pretty TailCallAttribute where
-  pretty = \case
-    Tail -> "tail"
-    NoTail -> "notail"
-    MustTail -> "musttail"
+renderCC :: Renderer CallingConvention
+renderCC buf = \case
+  C -> buf |># "ccc"#
+  Fast -> buf |># "fastcc"#
+{-# INLINABLE renderCC #-}
 
-instance Pretty CallingConvention where
-  pretty = \case
-    C -> "ccc"
-    Fast -> "fastcc"
+renderComparisonType :: Renderer ComparisonType
+renderComparisonType buf = \case
+  EQ  -> buf |># "eq"#
+  NE  -> buf |># "ne"#
+  UGT -> buf |># "ugt"#
+  UGE -> buf |># "uge"#
+  ULT -> buf |># "ult"#
+  ULE -> buf |># "ule"#
+  SGT -> buf |># "sgt"#
+  SGE -> buf |># "sge"#
+  SLT -> buf |># "slt"#
+  SLE -> buf |># "sle"#
+{-# INLINABLE renderComparisonType #-}
 
-instance Pretty ComparisonType where
-  pretty = \case
-    EQ  -> "eq"
-    NE -> "ne"
-    UGT -> "ugt"
-    UGE -> "uge"
-    ULT -> "ult"
-    ULE -> "ule"
-    SGT -> "sgt"
-    SGE -> "sge"
-    SLT -> "slt"
-    SLE -> "sle"
+renderMemoryOrdering :: Renderer MemoryOrdering
+renderMemoryOrdering buf = \case
+  Unordered              -> buf |># "unordered"#
+  Monotonic              -> buf |># "monotonic"#
+  Acquire                -> buf |># "acquire"#
+  Release                -> buf |># "release"#
+  AcquireRelease         -> buf |># "acq_rel"#
+  SequentiallyConsistent -> buf |># "seq_cst"#
+{-# INLINABLE renderMemoryOrdering #-}
 
-instance Pretty SynchronizationScope where
-  pretty = \case
-    SingleThread ->
-      "syncscope(" <> dquotes "singlethread" <> ")"
-    System -> mempty
+renderSyncScope :: Renderer SynchronizationScope
+renderSyncScope buf = \case
+  SingleThread ->
+    buf |># "syncscope(\"singlethread\")"#
+  System ->
+    buf
+{-# INLINABLE renderSyncScope #-}
 
-instance Pretty MemoryOrdering where
-  pretty = \case
-    Unordered              -> "unordered"
-    Monotonic              -> "monotonic"
-    Acquire                -> "acquire"
-    Release                -> "release"
-    AcquireRelease         -> "acq_rel"
-    SequentiallyConsistent -> "seq_cst"
+renderIR :: Renderer IR
+renderIR buf = \case
+  Add nuw nsw a b ->
+    renderArithBinOp buf "add "# nuw nsw a b
+  Mul nuw nsw a b ->
+    renderArithBinOp buf "mul "# nuw nsw a b
+  Sub nuw nsw a b ->
+    renderArithBinOp buf "sub "# nuw nsw a b
+  Udiv exact a b ->
+    ((((optional exact (buf |># "udiv "#) (|># "exact "#) `renderType` typeOf a)
+    |>. ' ') `renderOperand` a) |># ", "#) `renderOperand` b
+  And a b ->
+    ((((buf |># "and "#) `renderType` typeOf a) |>. ' ') `renderOperand` a |># ", "#) `renderOperand` b
+  ICmp cmp a b ->
+    (((((buf |># "icmp "#) `renderComparisonType` cmp |>. ' ') `renderType` typeOf a) |>. ' ') `renderOperand` a |># ", "#) `renderOperand` b
+  Trunc val to ->
+    renderConvertOp buf "trunc "# val to
+  Zext val to ->
+    renderConvertOp buf "zext "# val to
+  Bitcast val to ->
+    renderConvertOp buf "bitcast "# val to
+  PtrToInt val to ->
+    renderConvertOp buf "ptrtoint "# val to
+  Alloca ty mNumElems alignment ->
+    renderMaybe
+      (renderMaybe ((buf |># "alloca "#) `renderType` ty) mNumElems
+        (\buf' count -> ((buf' |># ", "#) `renderType` typeOf count |>. ' ') `renderOperand` count))
+      (if alignment == 0 then Nothing else Just alignment)
+      (\buf' align -> buf' |># ", align "# |>$ align)
+  GetElementPtr inbounds pointer indices ->
+    case typeOf pointer of
+      ty@(PointerType innerTy) ->
+        commas (((optional inbounds (buf |># "getelementptr "#) (|># "inbounds "#) `renderType` innerTy |># ", "#) `renderType` ty |>. ' ')
+        `renderOperand` pointer |># ", "#) indices prettyIndex
+      _ ->
+        buf |> error "Operand given to `getelementptr` that is not a pointer!"
+    where
+      prettyIndex :: Buffer %1 -> Operand -> Buffer
+      prettyIndex buf' i = (renderType buf' (typeOf i) |>. ' ') `renderOperand` i
+  Load volatile addr atomicity alignment ->
+    case atomicity of
+      Nothing ->
+        withAlignment alignment
+          ((((optional volatile (buf |># "load "#) (|># "volatile "#)
+            `renderType` resultTy) |># ", "#) `renderType` ptrTy |>. ' ') `renderOperand` addr)
+      Just (syncScope, memoryOrdering) ->
+        withAlignment alignment
+          ((((((optional volatile (buf |># "load atomic "#) (|># "volatile "#)
+            `renderType` resultTy) |># ", "#) `renderType` ptrTy |>. ' ') `renderOperand` addr |>. ' ')
+            `renderSyncScope` syncScope |>. ' ') `renderMemoryOrdering` memoryOrdering)
+    where
+      ptrTy = typeOf addr
+      resultTy = case ptrTy of
+        PointerType ty -> ty
+        _ -> error "Malformed AST, expected pointer type."
+  Store volatile addr value atomicity alignment ->
+    case atomicity of
+      Nothing ->
+        withAlignment alignment
+          ((((optional volatile (buf |># "store "#) (|># "volatile "#) `renderType` ty |>. ' ') `renderOperand` value |># ", "#)
+            `renderType` ptrTy |>. ' ') `renderOperand` addr)
+      Just (syncScope, memoryOrdering) ->
+        withAlignment alignment
+          ((((((optional volatile (buf |># "store atomic "#) (|># "volatile "#) `renderType` ty |>. ' ') `renderOperand` value |># ", "#)
+            `renderType` ptrTy |>. ' ') `renderOperand` addr |>. ' ') `renderSyncScope` syncScope |>. ' ') `renderMemoryOrdering` memoryOrdering)
+    where
+      ty = typeOf value
+      ptrTy = PointerType ty
+  Phi cases@((val, _) :| _) ->
+    commas ((buf |># "phi "#) `renderType` typeOf val |>. ' ') (NE.toList cases) renderPhiCase
+    where
+      renderPhiCase :: Renderer (Operand, Name)
+      renderPhiCase buf' (value, name) =
+        brackets buf' (\buf'' -> (renderOperand buf'' value |># ", %"#) `renderName` name)
+  Call tcAttr cc fn args ->
+    (((renderMaybe buf tcAttr (\buf' tca -> renderTCA buf' tca |>. ' ')
+      |># "call "#) `renderCC` cc |>. ' ') `renderType` resultType |>. ' ')
+      `renderOperand` fn `renderArgs` args
+    where
+      resultType = case typeOf fn of
+        PointerType (FunctionType retTy _) -> retTy
+        FunctionType retTy _ -> retTy
+        _ -> error "Malformed AST, expected function type."
+      renderArgs :: Renderer [Operand]
+      renderArgs buf' args' = tupled buf' args' renderArg
+      renderArg :: Renderer Operand
+      renderArg buf' arg =
+        (renderType buf' (typeOf arg) |>. ' ') `renderOperand` arg
+  Ret term -> case term of
+    Nothing ->
+      buf |># "ret void"#
+    Just operand ->
+      ((buf |># "ret "#) `renderType` typeOf operand |>. ' ') `renderOperand` operand
+  Br blockName ->
+    (buf |># "br label %"#) `renderName` blockName
+  CondBr cond trueLabel falseLabel ->
+    (((buf |># "br i1 "#) `renderOperand` cond
+      |># ", label %"#) `renderName` trueLabel
+      |># ", label %"#) `renderName` falseLabel
+  Switch val defaultLabel cases ->
+    brackets ((((buf |># "switch "#) `renderType` typeOf val |>. ' ') `renderOperand` val |># ", label %"#) `renderName` defaultLabel |>. ' ')
+      (\buf' -> hsep buf' cases renderCase)
+    where
+      renderCase :: Renderer (Operand, Name)
+      renderCase buf' (caseVal, label) =
+        ((renderType buf' (typeOf caseVal) |>. ' ') `renderOperand` caseVal |># ", label %"#) `renderName` label
+  Select c t f ->
+    ((((((buf |># "select "#) `renderType` typeOf c |>. ' ') `renderOperand` c |># ", "#)
+      `renderType` typeOf t |>. ' ') `renderOperand` t |># ", "#)
+      `renderType` typeOf f |>. ' ') `renderOperand` f
+  where
+    withAlignment :: Word32 -> Buffer %1 -> Buffer
+    withAlignment alignment buf' =
+      if alignment == 0
+        then buf'
+        else buf' |># ", align "# |>$ alignment
+{-# INLINABLE renderIR #-}
 
-prettyArithBinOp :: Doc ann -> Flag NUW -> Flag NSW -> Operand -> Operand -> Doc ann
-prettyArithBinOp opName nuw nsw a b =
-  opName <+> optional nuw "nuw" <> optional nsw "nsw" <> pretty (typeOf a) <+> pretty a <> "," <+> pretty b
+renderArithBinOp :: Buffer %1 -> Addr# -> Flag NUW -> Flag NSW -> Operand -> Operand -> Buffer
+renderArithBinOp buf opName nuw nsw a b =
+  (((optional nsw (optional nuw
+    (buf |># opName) (|># "nuw "#)) (|># "nsw "#) `renderType` typeOf a) |>. ' ') `renderOperand` a |># ", "#) `renderOperand` b
+{-# INLINABLE renderArithBinOp #-}
 
-prettyConvertOp :: Doc ann -> Operand -> Type -> Doc ann
-prettyConvertOp opName val to =
-  opName <+> pretty (typeOf val) <+> pretty val <+> "to" <+> pretty to
-
-optional :: Flag a -> Doc ann -> Doc ann
-optional flag doc = case flag of
-  Off -> mempty
-  On -> doc <> " "
-
-maybeDoc :: Maybe a -> (a -> Doc ann) -> Doc ann
-maybeDoc = flip (maybe mempty)
+renderConvertOp :: Buffer %1 -> Addr# -> Operand -> Type -> Buffer
+renderConvertOp buf opName val to =
+  ((((buf |># opName) `renderType` typeOf val) |>. ' ') `renderOperand` val |># " to "#) `renderType` to
+{-# INLINABLE renderConvertOp #-}

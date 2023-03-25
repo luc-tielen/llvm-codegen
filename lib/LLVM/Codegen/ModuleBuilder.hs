@@ -19,6 +19,7 @@ module LLVM.Codegen.ModuleBuilder
   , getTypedefs
   , lookupType
   , withFunctionAttributes
+  , renderModule
   ) where
 
 import GHC.Stack
@@ -39,23 +40,18 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString as BS
-import qualified Data.List as L
 import Data.Functor.Identity
 import LLVM.Codegen.IRBuilder.Monad
 import LLVM.Codegen.Operand
 import LLVM.Codegen.Type
+import LLVM.Codegen.Name
 import LLVM.Codegen.Flag
-import LLVM.Codegen.NameSupply
 import LLVM.Codegen.IR
 import LLVM.Pretty
 
 
 newtype Module
   = Module [Definition]
-
-instance Pretty Module where
-  pretty (Module defs) =
-    vsep $ L.intersperse mempty $ map pretty defs
 
 data ParameterName
   = ParameterName !T.Text
@@ -85,55 +81,6 @@ data Definition
   = GlobalDefinition !Global
   | TypeDefinition !Name !Typedef
   deriving Show
-
-instance Pretty Definition where
- pretty = \case
-   GlobalDefinition g ->
-     pretty g
-   TypeDefinition name typeDef ->
-     let prettyTy = case typeDef of
-          Opaque -> "opaque"
-          Clear ty -> pretty ty
-      in "%" <> pretty name <+> "=" <+> "type" <+> prettyTy
-
-instance Pretty Global where
-  pretty = \case
-    GlobalVariable name ty constant ->
-      "@" <> pretty name <+> "=" <+> "global" <+> pretty ty <+> pretty constant
-    Function name retTy args attrs body
-      | null body ->
-        "declare external ccc" <+> pretty retTy <+> fnName <> toTuple (map (pretty . fst) args) <> prettyAttrs
-      | otherwise ->
-        "define external ccc" <+> pretty retTy <+> fnName <> toTuple (zipWith prettyArg [0..] args) <> prettyAttrs <+>
-          "{" <> hardline <>
-          prettyBody body <> hardline <>
-          "}"
-      where
-        fnName = "@" <> pretty name
-        prettyArg :: Int -> (Type, ParameterName) -> Doc ann
-        prettyArg i (argTy, nm) =
-          case nm of
-            NoParameterName ->
-              pretty argTy <+> pretty (LocalRef argTy $ Name $ T.pack $ show i)
-            ParameterName paramName ->
-              pretty argTy <+> pretty (LocalRef argTy $ Name paramName)
-        prettyBody blocks =
-          vsep $ map pretty blocks
-        prettyAttrs =
-          if null attrs
-            then mempty
-            else mempty <+> hsep (map pretty attrs)
-        toTuple argDocs =
-          parens $ argDocs `sepBy` ", "
-        sepBy docs separator =
-          mconcat $ L.intersperse separator docs
-
-instance Pretty FunctionAttribute where
-  pretty = \case
-    AlwaysInline ->
-      "alwaysinline"
-    WasmExportName name ->
-      dquotes "wasm-export-name" <> "=" <> dquotes (pretty name)
 
 data ModuleBuilderState
   = ModuleBuilderState
@@ -282,7 +229,7 @@ global name ty constant = do
   pure $ ConstantOperand $ GlobalRef (ptr ty) name
 {-# INLINEABLE global #-}
 
-globalUtf8StringPtr :: (HasCallStack, MonadNameSupply m, MonadModuleBuilder m, MonadIRBuilder m)
+globalUtf8StringPtr :: (HasCallStack, MonadModuleBuilder m, MonadIRBuilder m)
                     => T.Text -> Name -> m Operand
 globalUtf8StringPtr txt name = do
   let utf8Bytes = BS.snoc (TE.encodeUtf8 txt) 0  -- 0-terminated UTF8 string
@@ -328,7 +275,57 @@ extern name argTys retTy = do
 mkOperand :: Monad m => Type -> ParameterName -> IRBuilderT m (Name, Operand)
 mkOperand ty paramName = do
   name <- case paramName of
-    NoParameterName -> fresh
-    ParameterName name -> fresh `named` Name name
+    NoParameterName -> freshName Nothing
+    ParameterName name -> freshName (Just name)
   pure (name, LocalRef ty name)
 {-# INLINEABLE mkOperand #-}
+
+renderModule :: Renderer Module
+renderModule buf (Module defs) =
+  sepBy "\n\n"# buf defs renderDefinition
+{-# INLINEABLE renderModule #-}
+
+renderDefinition :: Renderer Definition
+renderDefinition buf = \case
+  GlobalDefinition g ->
+    renderGlobal buf g
+  TypeDefinition name typeDef ->
+    case typeDef of
+      Opaque ->
+        (buf |>. '%') `renderName` name |># " = type opaque"#
+      Clear ty ->
+        ((buf |>. '%') `renderName` name |># " = type "#) `renderType` ty
+{-# INLINEABLE renderDefinition #-}
+
+renderGlobal :: Renderer Global
+renderGlobal buf = \case
+  GlobalVariable name ty constant ->
+    (((((buf |>. '@') `renderName` name) |># " = global "#) `renderType` ty) |>. ' ') `renderConstant` constant
+  Function name retTy args attrs body
+    | null body ->
+      hsep (tupled ((((buf |># "declare external ccc "#) `renderType` retTy) |># " @"#) `renderName` name) argTys renderType
+        |># (if null attrs then ""# else " "#)) attrs renderFunctionAttr
+    | otherwise ->
+      vsep (hsep (tupled ((((buf |># "define external ccc "#) `renderType` retTy) |># " @"#) `renderName` name) (zip [0..] args) renderArg |>. ' ') attrs renderFunctionAttr
+        |># (if null attrs then "{\n"# else " {\n"#)) body renderBasicBlock |># "\n}"#
+    where
+      argTys = map fst args
+      renderArg :: Renderer (Int, (Type, ParameterName))
+      renderArg buf' (i, (argTy, nm)) =
+        let localRef = case nm of
+              NoParameterName ->
+                LocalRef argTy $ Name $ T.pack $ show i
+              ParameterName paramName ->
+                LocalRef argTy $ Name paramName
+         in ((buf' `renderType` argTy) |>. ' ') `renderOperand` localRef
+{-# INLINEABLE renderGlobal #-}
+
+renderFunctionAttr :: Renderer FunctionAttribute
+renderFunctionAttr buf = \case
+  AlwaysInline ->
+    buf |># "alwaysinline"#
+  WasmExportName name ->
+    dquotes
+      (dquotes buf (|># "wasm-export-name"#) |>. '=')
+      (|> name)
+{-# INLINEABLE renderFunctionAttr #-}
