@@ -129,7 +129,7 @@ partialBlockToBasicBlock pb =
 
 block :: (MonadIRBuilder m) => m Name
 block = do
-  blockName <- freshName Nothing
+  blockName <- freshName (Just "block")
   emitBlockStart blockName
   pure blockName
 {-# INLINEABLE block #-}

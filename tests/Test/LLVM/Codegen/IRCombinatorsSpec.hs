@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes, RecursiveDo, OverloadedLists #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Test.LLVM.Codegen.IRCombinatorsSpec
   ( module Test.LLVM.Codegen.IRCombinatorsSpec
@@ -69,7 +70,7 @@ spec = describe "IR builder combinators" $ parallel $ do
               if' isEqual $ do
                 br end
 
-            end <- block `named` "end"
+            end <- blockNamed "end"
             ret $ int32 42
     checkIR ir [text|
       define external ccc i32 @func() {

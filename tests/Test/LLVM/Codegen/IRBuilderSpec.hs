@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes, RecursiveDo #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Test.LLVM.Codegen.IRBuilderSpec
   ( module Test.LLVM.Codegen.IRBuilderSpec
@@ -182,7 +183,7 @@ spec = describe "constructing LLVM IR" $ do
           function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> mdo
             c <- add a b
             -- NOTE: invalid IR
-            _ <- block `named` "next"
+            _ <- blockNamed "next"
             ret c
     checkIR ir [text|
       define external ccc i32 @do_add(i32 %a_0, i32 %b_0) {
@@ -194,37 +195,25 @@ spec = describe "constructing LLVM IR" $ do
       }
       |]
 
-  it "supports giving instruction operands a user-defined name" $ do
+  it "avoids name collisions by appending a unique suffix" $ do
     let ir = do
           function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> mdo
-            c <- add a b `named` "c"
-            d' <- flip named "d" $ do
-              d <- add b c
-              add d (int32 42)
-            ret d'
-    checkIR ir [text|
-      define external ccc i32 @do_add(i32 %a_0, i32 %b_0) {
-      start:
-        %c_0 = add i32 %a_0, %b_0
-        %d_0 = add i32 %b_0, %c_0
-        %d_1 = add i32 %d_0, 42
-        ret i32 %d_1
-      }
-      |]
-
-  it "avoids name collissions by appending a unique suffix" $ do
-    let ir = do
-          function "do_add" [(i32, "a"), (i32, "b")] i32 $ \[a, b] -> mdo
-            c <- flip named "c" $ do
-              c0 <- add a b
-              add c0 c0
+            _ <- blockNamed "blk"
+            c <- add a b
+            _ <- add c c
+            br blk2
+            blk2 <- blockNamed "blk"
             ret c
     checkIR ir [text|
       define external ccc i32 @do_add(i32 %a_0, i32 %b_0) {
       start:
-        %c_0 = add i32 %a_0, %b_0
-        %c_1 = add i32 %c_0, %c_0
-        ret i32 %c_1
+        br label %blk_0
+      blk_0:
+        %0 = add i32 %a_0, %b_0
+        %1 = add i32 %0, %0
+        br label %blk_1
+      blk_1:
+        ret i32 %0
       }
       |]
 
