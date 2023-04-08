@@ -61,7 +61,8 @@ data PartialBlock
 
 data IRBuilderState
   = IRBuilderState
-  { basicBlocks :: !(DList BasicBlock)
+  { allocas :: !(DList (Maybe Operand, IR))
+  , basicBlocks :: !(DList BasicBlock)
   , currentPartialBlock :: !PartialBlock
   , operandCounter :: !Int
   , nameMap :: !(Map T.Text Int)
@@ -108,13 +109,20 @@ type IRBuilder = IRBuilderT Identity
 runIRBuilderT :: Monad m => IRBuilderT m a -> m (a, [BasicBlock])
 runIRBuilderT (IRBuilderT m) = do
   let partialBlock = PartialBlock (Name "start") mempty mempty 0
-      result = runStateT m (IRBuilderState mempty partialBlock 0 mempty)
+      result = runStateT m (IRBuilderState mempty mempty partialBlock 0 mempty)
   fmap (second getBlocks) result
   where
     getBlocks irState =
-      let previousBlocks = DList.apply (basicBlocks irState) mempty
-          currentBlk = currentPartialBlock irState
-       in previousBlocks ++ [partialBlockToBasicBlock currentBlk]
+      case blocks of
+        [] -> []
+        (firstBlk:restBlks) ->
+          let firstBlk' = firstBlk { bbInstructions = DList.append allocations (bbInstructions firstBlk) }
+           in (firstBlk':restBlks)
+      where
+        previousBlocks = DList.apply (basicBlocks irState) mempty
+        currentBlk = currentPartialBlock irState
+        blocks = previousBlocks <> [partialBlockToBasicBlock currentBlk]
+        allocations = allocas irState
 {-# INLINEABLE runIRBuilderT #-}
 
 runIRBuilder :: IRBuilder a -> (a, [BasicBlock])
@@ -190,10 +198,18 @@ freshUnnamed = do
 {-# INLINEABLE freshUnnamed #-}
 
 emitInstr :: (MonadIRBuilder m) => Type -> IR -> m Operand
-emitInstr ty instr = do
-  operand <- mkOperand ty
-  addInstrToCurrentBlock (Just operand) instr
-  pure operand
+emitInstr ty = \case
+  instr@(Alloca {}) -> do
+    -- For performant code, all alloca instructions should be at the start of the function!
+    -- https://llvm.org/docs/Frontend/PerformanceTips.html#use-of-allocas
+    -- (A custom operand name is only used here to avoid having to re-number all operands.)
+    operand <- LocalRef ty <$!> freshName (Just "stack.ptr")
+    addAlloca operand instr
+    pure operand
+  instr -> do
+    operand <- mkOperand ty
+    addInstrToCurrentBlock (Just operand) instr
+    pure operand
 {-# INLINABLE emitInstr #-}
 
 emitInstrVoid :: MonadIRBuilder m => IR -> m ()
@@ -207,6 +223,12 @@ addInstrToCurrentBlock operand instr =
     let instrs = DList.snoc (pbInstructions blk) (operand, instr)
         in blk { pbInstructions = instrs, pbNumInstrs = pbNumInstrs blk + 1 }
 {-# INLINEABLE addInstrToCurrentBlock #-}
+
+addAlloca :: MonadIRBuilder m => Operand -> IR -> m ()
+addAlloca operand instr =
+  modifyIRBuilderState $ \s ->
+    s { allocas = DList.snoc (allocas s) (Just operand, instr) }
+{-# INLINEABLE addAlloca #-}
 
 emitTerminator :: MonadIRBuilder m => Terminator -> m ()
 emitTerminator term =

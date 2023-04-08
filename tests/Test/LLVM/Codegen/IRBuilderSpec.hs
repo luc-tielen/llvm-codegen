@@ -217,6 +217,29 @@ spec = describe "constructing LLVM IR" $ do
       }
       |]
 
+  it "shifts allocas to start of the entry basic block" $ do
+    let ir = do
+          function "func" [(i32, "a")] i32 $ \[a] -> mdo
+            _ <- alloca i32 Nothing 0
+            b <- add a a
+            br blk
+            blk <- blockNamed "blk"
+            _ <- alloca i64 Nothing 0
+            c <- add b b
+            ret c
+    checkIR ir [text|
+      define external ccc i32 @func(i32 %a_0) {
+      start:
+        %stack.ptr_0 = alloca i32
+        %stack.ptr_1 = alloca i64
+        %0 = add i32 %a_0, %a_0
+        br label %blk_0
+      blk_0:
+        %1 = add i32 %0, %0
+        ret i32 %1
+      }
+      |]
+
   it "supports 'add' instruction" $ do
     let ir = do
           function "do_add" [(i8, "a"), (i8, "b")] i8 $ \[a, b] -> do
@@ -370,9 +393,9 @@ spec = describe "constructing LLVM IR" $ do
     checkIR ir [text|
       define external ccc i32 @func(i32 %a_0) {
       start:
-        %0 = alloca i64
-        %1 = alloca i1, i32 8
-        %2 = alloca i1, align 8
+        %stack.ptr_0 = alloca i64
+        %stack.ptr_1 = alloca i1, i32 8
+        %stack.ptr_2 = alloca i1, align 8
         ret i32 %a_0
       }
       |]
