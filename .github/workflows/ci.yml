@@ -72,7 +72,13 @@ jobs:
 
       - name: Build
         run: |
-          which llvm-config
+          if [ "$RUNNER_OS" == "macOS" ]; then
+              echo "PATH=$PATH"
+              echo 'export PATH="/usr/local/opt/llvm@14/bin:$PATH"' >> /Users/runner/.bash_profile
+              source /Users/runner/.bash_profile
+              echo "PATH=$PATH"
+              which llvm-config
+          fi
           cabal build all
 
       - name: Run tests
