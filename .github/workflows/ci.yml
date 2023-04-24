@@ -33,6 +33,7 @@ jobs:
           CABAL_VERSION=$(cabal --numeric-version)
           echo "GHC_VERSION=${GHC_VERSION}"     >> "${GITHUB_ENV}"
           echo "CABAL_VERSION=${CABAL_VERSION}" >> "${GITHUB_ENV}"
+          cabal install hspec-discover
 
       - name: Configure the build
         run: |
