@@ -34,7 +34,11 @@ jobs:
           echo "GHC_VERSION=${GHC_VERSION}"     >> "${GITHUB_ENV}"
           echo "CABAL_VERSION=${CABAL_VERSION}" >> "${GITHUB_ENV}"
           cabal install hspec-discover
-
+          if [ "$RUNNER_OS" == "macOS" ]; then
+              echo "Installing llvm-14 on $RUNNER_OS"
+              brew install llvm@14
+          fi
+          
       - name: Configure the build
         run: |
           cabal configure --enable-tests --enable-benchmarks --disable-documentation
