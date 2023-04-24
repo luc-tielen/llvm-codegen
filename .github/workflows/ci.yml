@@ -38,8 +38,8 @@ jobs:
               echo "Installing llvm-14 on $RUNNER_OS"
               brew install llvm@14
               echo 'export PATH="/usr/local/opt/llvm@14/bin:$PATH"' >> /Users/runner/.bash_profile
-              export PATH="/usr/local/opt/llvm@14/bin:$PATH"
-              echo 'PATH="$PATH"'
+              source /Users/runner/.bash_profile
+              echo "PATH=$PATH"
           fi
           
       - name: Configure the build
