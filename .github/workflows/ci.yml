@@ -37,10 +37,6 @@ jobs:
           if [ "$RUNNER_OS" == "macOS" ]; then
               echo "Installing llvm-14 on $RUNNER_OS"
               brew install llvm@14
-              echo 'export PATH="/usr/local/opt/llvm@14/bin:$PATH"' >> /Users/runner/.bash_profile
-              source /Users/runner/.bash_profile
-              echo "PATH=$PATH"
-              which llvm-config
           fi
           
       - name: Configure the build
@@ -73,13 +69,17 @@ jobs:
       - name: Build
         run: |
           if [ "$RUNNER_OS" == "macOS" ]; then
-              echo "PATH=$PATH"
-              echo 'export PATH="/usr/local/opt/llvm@14/bin:$PATH"' >> /Users/runner/.bash_profile
-              source /Users/runner/.bash_profile
+              export PATH="/usr/local/opt/llvm@14/bin:$PATH"
               echo "PATH=$PATH"
               which llvm-config
           fi
           cabal build all
 
       - name: Run tests
-        run: cabal test all
+        run: |
+          if [ "$RUNNER_OS" == "macOS" ]; then
+              export PATH="/usr/local/opt/llvm@14/bin:$PATH"
+              echo "PATH=$PATH"
+              which llvm-config
+          fi
+          cabal test all
