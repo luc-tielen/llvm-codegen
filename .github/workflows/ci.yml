@@ -37,6 +37,7 @@ jobs:
           if [ "$RUNNER_OS" == "macOS" ]; then
               echo "Installing llvm-14 on $RUNNER_OS"
               brew install llvm@14
+              echo 'export PATH="/usr/local/opt/llvm@14/bin:$PATH"' >> /Users/runner/.bash_profile
           fi
           
       - name: Configure the build
