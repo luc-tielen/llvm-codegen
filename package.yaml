@@ -47,8 +47,6 @@ ghc-options:
   - -fno-sort-valid-hole-fits
   - -optl=-lLLVM-14
 
-system-build-tools: llvm-config
-
 library:
   source-dirs: lib
 

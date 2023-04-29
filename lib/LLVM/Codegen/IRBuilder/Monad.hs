@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, RankNTypes, MultiParamTypeClasses, UndecidableInstances, BangPatterns #-}
+{-# LANGUAGE TypeFamilies, RankNTypes, MultiParamTypeClasses, UndecidableInstances, BangPatterns, TypeOperators #-}
 
 module LLVM.Codegen.IRBuilder.Monad
   ( IRBuilderT

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, UndecidableInstances, TypeOperators #-}
 
 module LLVM.Codegen.ModuleBuilder
   ( ModuleBuilderT
