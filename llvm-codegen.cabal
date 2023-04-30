@@ -1,4 +1,4 @@
-cabal-version: 1.24
+cabal-version: 2.0
 
 -- This file has been generated from package.yaml by hpack version 0.35.2.
 --
@@ -39,6 +39,8 @@ library
       LLVM.Pretty
   other-modules:
       Paths_llvm_codegen
+  autogen-modules:
+      Paths_llvm_codegen
   hs-source-dirs:
       lib
   default-extensions:
@@ -59,6 +61,8 @@ library
       LinearTypes
       MagicHash
   ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits -optl=-lLLVM-14
+  build-tools:
+      llvm-config
   build-depends:
       base >=4.7 && <5
     , bytestring ==0.11.*
@@ -78,6 +82,8 @@ test-suite llvm-codegen-test
       Test.LLVM.C.APISpec
       Test.LLVM.Codegen.IRBuilderSpec
       Test.LLVM.Codegen.IRCombinatorsSpec
+      Paths_llvm_codegen
+  autogen-modules:
       Paths_llvm_codegen
   hs-source-dirs:
       tests
@@ -99,6 +105,8 @@ test-suite llvm-codegen-test
       LinearTypes
       MagicHash
   ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits -optl=-lLLVM-14
+  build-tools:
+      llvm-config
   build-depends:
       base >=4.7 && <5
     , bytestring ==0.11.*
