@@ -5,9 +5,9 @@ module Test.LLVM.Codegen.IRBuilderSpec
   ( module Test.LLVM.Codegen.IRBuilderSpec
   ) where
 
-import Prelude hiding (and, EQ)
+import Prelude hiding (and, or, EQ)
 import qualified Data.Text as T
-import Data.Foldable hiding (and)
+import Data.Foldable hiding (and, or)
 import Test.Hspec
 import NeatInterpolation
 import Data.Text (Text)
@@ -301,6 +301,19 @@ spec = describe "constructing LLVM IR" $ do
       define external ccc i1 @func(i1 %a_0, i1 %b_0) {
       start:
         %0 = and i1 %a_0, %b_0
+        ret i1 %0
+      }
+      |]
+
+  it "supports 'or' instruction" $ do
+    let ir = do
+          function "func" [(i1, "a"), (i1, "b")] i1 $ \[a, b] -> do
+            c <- or a b
+            ret c
+    checkIR ir [text|
+      define external ccc i1 @func(i1 %a_0, i1 %b_0) {
+      start:
+        %0 = or i1 %a_0, %b_0
         ret i1 %0
       }
       |]

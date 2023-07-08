@@ -82,6 +82,7 @@ data IR
   | Sub !(Flag NUW) !(Flag NSW) !Operand !Operand
   | Udiv !(Flag Exact) !Operand !Operand
   | And !Operand !Operand
+  | Or !Operand !Operand
   | Trunc !Operand !Type
   | Zext !Operand !Type
   | Bitcast !Operand !Type
@@ -163,6 +164,8 @@ renderIR buf = \case
     |>. ' ') `renderOperand` a) |># ", "#) `renderOperand` b
   And a b ->
     ((((buf |># "and "#) `renderType` typeOf a) |>. ' ') `renderOperand` a |># ", "#) `renderOperand` b
+  Or a b ->
+    ((((buf |># "or "#) `renderType` typeOf a) |>. ' ') `renderOperand` a |># ", "#) `renderOperand` b
   ICmp cmp a b ->
     (((((buf |># "icmp "#) `renderComparisonType` cmp |>. ' ') `renderType` typeOf a) |>. ' ') `renderOperand` a |># ", "#) `renderOperand` b
   Trunc val to ->

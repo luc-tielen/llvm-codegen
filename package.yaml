@@ -35,6 +35,7 @@ default-extensions:
   - DerivingVia
   - FlexibleContexts
   - FlexibleInstances
+  - TypeOperators
   - ScopedTypeVariables
   - DefaultSignatures
   - LinearTypes

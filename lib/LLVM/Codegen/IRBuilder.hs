@@ -19,6 +19,7 @@ module LLVM.Codegen.IRBuilder
   , sub
   , udiv
   , and
+  , or
   , trunc
   , zext
   , ptrtoint
@@ -68,7 +69,7 @@ module LLVM.Codegen.IRBuilder
   , nullPtr
   ) where
 
-import Prelude hiding (EQ, and)
+import Prelude hiding (EQ, and, or)
 import GHC.Stack
 import Control.Monad.Fix
 import qualified Data.List.NonEmpty as NE
@@ -108,6 +109,11 @@ and :: (MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
 and lhs rhs =
   emitInstr (typeOf lhs) $ And lhs rhs
 {-# INLINEABLE and #-}
+
+or :: (MonadIRBuilder m, HasCallStack) => Operand -> Operand -> m Operand
+or lhs rhs =
+  emitInstr (typeOf lhs) $ Or lhs rhs
+{-# INLINEABLE or #-}
 
 trunc :: (MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
 trunc val ty =
