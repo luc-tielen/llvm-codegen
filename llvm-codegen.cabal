@@ -56,7 +56,6 @@ library
       DerivingVia
       FlexibleContexts
       FlexibleInstances
-      TypeOperators
       ScopedTypeVariables
       DefaultSignatures
       LinearTypes
@@ -101,7 +100,6 @@ test-suite llvm-codegen-test
       DerivingVia
       FlexibleContexts
       FlexibleInstances
-      TypeOperators
       ScopedTypeVariables
       DefaultSignatures
       LinearTypes
