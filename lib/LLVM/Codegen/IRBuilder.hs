@@ -325,7 +325,9 @@ pointerDiff ty a b = do
   a' <- ptrtoint a i64
   b' <- ptrtoint b i64
   result <- sub a' b'
-  trunc result ty
+  if ty == i64
+    then pure result
+    else trunc result ty
 {-# INLINEABLE pointerDiff #-}
 
 -- | Calculates the logical not of a boolean 'Operand'.
