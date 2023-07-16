@@ -76,10 +76,10 @@ spec = describe "IR builder combinators" $ parallel $ do
       define external ccc i32 @func() {
       start:
         %stack.ptr_0 = alloca i32
-        store i32 0, i32* %stack.ptr_0
+        store i32 0, ptr %stack.ptr_0
         br label %loop_0
       loop_0:
-        %0 = load i32, i32* %stack.ptr_0
+        %0 = load i32, ptr %stack.ptr_0
         %1 = icmp eq i32 %0, 10
         br i1 %1, label %if_0, label %end_if_0
       if_0:
@@ -108,16 +108,16 @@ spec = describe "IR builder combinators" $ parallel $ do
       define external ccc i32 @func() {
       start:
         %stack.ptr_0 = alloca i32
-        store i32 10, i32* %stack.ptr_0
+        store i32 10, ptr %stack.ptr_0
         br label %while_begin_0
       while_begin_0:
-        %0 = load i32, i32* %stack.ptr_0
+        %0 = load i32, ptr %stack.ptr_0
         %1 = icmp ne i32 %0, 0
         br i1 %1, label %while_body_0, label %while_end_0
       while_body_0:
-        %2 = load i32, i32* %stack.ptr_0
+        %2 = load i32, ptr %stack.ptr_0
         %3 = sub i32 %2, 1
-        store i32 %3, i32* %stack.ptr_0
+        store i32 %3, ptr %stack.ptr_0
         br label %while_begin_0
       while_end_0:
         ret i32 42
@@ -139,16 +139,16 @@ spec = describe "IR builder combinators" $ parallel $ do
       define external ccc i32 @func() {
       start:
         %stack.ptr_0 = alloca i32
-        store i32 10, i32* %stack.ptr_0
+        store i32 10, ptr %stack.ptr_0
         br label %for_begin_0
       for_begin_0:
         %0 = phi i32 [0, %start], [%4, %for_body_0]
         %1 = icmp ult i32 %0, 10
         br i1 %1, label %for_body_0, label %for_end_0
       for_body_0:
-        %2 = load i32, i32* %stack.ptr_0
+        %2 = load i32, ptr %stack.ptr_0
         %3 = add i32 %0, %2
-        store i32 %3, i32* %stack.ptr_0
+        store i32 %3, ptr %stack.ptr_0
         %4 = add i32 1, %0
         br label %for_begin_0
       for_end_0:
@@ -168,10 +168,10 @@ spec = describe "IR builder combinators" $ parallel $ do
       define external ccc i32 @func() {
       start:
         %stack.ptr_0 = alloca i32, i32 5
-        %0 = getelementptr i32, i32* %stack.ptr_0, i32 0
-        %1 = getelementptr i32, i32* %stack.ptr_0, i32 3
-        %2 = ptrtoint i32* %0 to i64
-        %3 = ptrtoint i32* %1 to i64
+        %0 = getelementptr i32, ptr %stack.ptr_0, i32 0
+        %1 = getelementptr i32, ptr %stack.ptr_0, i32 3
+        %2 = ptrtoint ptr %0 to i64
+        %3 = ptrtoint ptr %1 to i64
         %4 = sub i64 %2, %3
         %5 = trunc i64 %4 to i32
         ret i32 42
@@ -217,7 +217,7 @@ spec = describe "IR builder combinators" $ parallel $ do
       define external ccc i32 @func() {
       start:
         %stack.ptr_0 = alloca i32
-        store i32 0, i32* %stack.ptr_0
+        store i32 0, ptr %stack.ptr_0
         ret i32 42
       }
       |]
@@ -237,7 +237,7 @@ spec = describe "IR builder combinators" $ parallel $ do
       define external ccc i32 @func() {
       start:
         %stack.ptr_0 = alloca i32, i32 5
-        %0 = getelementptr i32, i32* %stack.ptr_0, i32 5
+        %0 = getelementptr i32, ptr %stack.ptr_0, i32 5
         ret i32 42
       }
       |]
@@ -253,8 +253,8 @@ spec = describe "IR builder combinators" $ parallel $ do
       define external ccc i32 @func() {
       start:
         %stack.ptr_0 = alloca i32, i32 5
-        %0 = getelementptr i32, i32* %stack.ptr_0, i32 5
-        %1 = load i32, i32* %0
+        %0 = getelementptr i32, ptr %stack.ptr_0, i32 5
+        %1 = load i32, ptr %0
         ret i32 42
       }
       |]
@@ -270,8 +270,8 @@ spec = describe "IR builder combinators" $ parallel $ do
       define external ccc i32 @func() {
       start:
         %stack.ptr_0 = alloca i32, i32 5
-        %0 = getelementptr i32, i32* %stack.ptr_0, i32 5
-        store i32 1000, i32* %0
+        %0 = getelementptr i32, ptr %stack.ptr_0, i32 5
+        store i32 1000, ptr %0
         ret i32 42
       }
       |]
@@ -288,12 +288,12 @@ spec = describe "IR builder combinators" $ parallel $ do
       define external ccc i32 @func() {
       start:
         %stack.ptr_0 = alloca i32, i32 5
-        %0 = getelementptr i32, i32* %stack.ptr_0, i32 5
-        store i32 1000, i32* %0
-        %1 = getelementptr i32, i32* %stack.ptr_0, i32 5
-        %2 = load i32, i32* %1
+        %0 = getelementptr i32, ptr %stack.ptr_0, i32 5
+        store i32 1000, ptr %0
+        %1 = getelementptr i32, ptr %stack.ptr_0, i32 5
+        %2 = load i32, ptr %1
         %3 = add i32 10, %2
-        store i32 %3, i32* %1
+        store i32 %3, ptr %1
         ret i32 42
       }
       |]
@@ -310,12 +310,12 @@ spec = describe "IR builder combinators" $ parallel $ do
       define external ccc i32 @func() {
       start:
         %stack.ptr_0 = alloca i32, i32 5
-        %0 = getelementptr i32, i32* %stack.ptr_0, i32 5
-        store i32 1000, i32* %0
-        %1 = getelementptr i32, i32* %stack.ptr_0, i32 5
-        %2 = load i32, i32* %1
+        %0 = getelementptr i32, ptr %stack.ptr_0, i32 5
+        store i32 1000, ptr %0
+        %1 = getelementptr i32, ptr %stack.ptr_0, i32 5
+        %2 = load i32, ptr %1
         %3 = add i32 1, %2
-        store i32 %3, i32* %1
+        store i32 %3, ptr %1
         ret i32 42
       }
       |]
@@ -334,12 +334,12 @@ spec = describe "IR builder combinators" $ parallel $ do
       start:
         %stack.ptr_0 = alloca i32, i32 5
         %stack.ptr_1 = alloca i32, i32 5
-        %0 = getelementptr i32, i32* %stack.ptr_0, i32 5
-        store i32 1000, i32* %0
-        %1 = getelementptr i32, i32* %stack.ptr_0, i32 5
-        %2 = load i32, i32* %1
-        %3 = getelementptr i32, i32* %stack.ptr_1, i32 5
-        store i32 %2, i32* %3
+        %0 = getelementptr i32, ptr %stack.ptr_0, i32 5
+        store i32 1000, ptr %0
+        %1 = getelementptr i32, ptr %stack.ptr_0, i32 5
+        %2 = load i32, ptr %1
+        %3 = getelementptr i32, ptr %stack.ptr_1, i32 5
+        store i32 %2, ptr %3
         ret i32 42
       }
       |]
@@ -358,16 +358,16 @@ spec = describe "IR builder combinators" $ parallel $ do
       start:
         %stack.ptr_0 = alloca i32, i32 5
         %stack.ptr_1 = alloca i32, i32 5
-        %0 = getelementptr i32, i32* %stack.ptr_0, i32 5
-        store i32 1000, i32* %0
-        %1 = getelementptr i32, i32* %stack.ptr_0, i32 5
-        %2 = load i32, i32* %1
-        %3 = getelementptr i32, i32* %stack.ptr_1, i32 5
-        %4 = load i32, i32* %3
-        %5 = getelementptr i32, i32* %stack.ptr_0, i32 5
-        store i32 %4, i32* %5
-        %6 = getelementptr i32, i32* %stack.ptr_1, i32 5
-        store i32 %2, i32* %6
+        %0 = getelementptr i32, ptr %stack.ptr_0, i32 5
+        store i32 1000, ptr %0
+        %1 = getelementptr i32, ptr %stack.ptr_0, i32 5
+        %2 = load i32, ptr %1
+        %3 = getelementptr i32, ptr %stack.ptr_1, i32 5
+        %4 = load i32, ptr %3
+        %5 = getelementptr i32, ptr %stack.ptr_0, i32 5
+        store i32 %4, ptr %5
+        %6 = getelementptr i32, ptr %stack.ptr_1, i32 5
+        store i32 %2, ptr %6
         ret i32 42
       }
       |]

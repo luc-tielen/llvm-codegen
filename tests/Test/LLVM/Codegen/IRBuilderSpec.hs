@@ -52,8 +52,8 @@ spec = describe "constructing LLVM IR" $ do
 
       define external ccc i8 @utf8_string_usage() {
       start:
-        %0 = getelementptr inbounds [16 x i8], [16 x i8]* @my_string, i32 0, i32 0
-        %1 = load i8, i8* %0
+        %0 = getelementptr inbounds [16 x i8], ptr @my_string, i32 0, i32 0
+        %1 = load i8, ptr %0
         ret i8 %1
       }
       |]
@@ -63,6 +63,7 @@ spec = describe "constructing LLVM IR" $ do
           let myType = ArrayType 10 i16
           _ <- typedef "my_type2" Off [myType, myType]
           _ <- typedef "my_type2_packed" On [myType, myType]
+          _ <- typedef "struct_with_ptrs" Off [ptr i8, ptr i16]
           s <- typedef "recursive" Off [ptr s]
           _ <- opaqueTypedef "my_opaque_type"
           pure ()
@@ -71,7 +72,9 @@ spec = describe "constructing LLVM IR" $ do
 
       %my_type2_packed = type <{[10 x i16], [10 x i16]}>
 
-      %recursive = type {%recursive*}
+      %struct_with_ptrs = type {ptr, ptr}
+
+      %recursive = type {ptr}
 
       %my_opaque_type = type opaque
       |]
@@ -81,9 +84,9 @@ spec = describe "constructing LLVM IR" $ do
           _ <- extern "symbol1" [i32, i64] (ptr i8)
           extern "symbol2" [] (ptr i8)
     checkIR ir [text|
-      declare external ccc i8* @symbol1(i32, i64)
+      declare external ccc ptr @symbol1(i32, i64)
 
-      declare external ccc i8* @symbol2()
+      declare external ccc ptr @symbol2()
       |]
 
   it "supports functions" $ do
@@ -96,6 +99,15 @@ spec = describe "constructing LLVM IR" $ do
       start:
         %0 = add i32 %a_0, %b_0
         ret i32 %0
+      }
+      |]
+    let ir2 = do
+          function "func_with_ptrs" [(ptr i32, "a"), (ptr i8, "b")] (ptr i32) $ \[a, _b] -> do
+            ret a
+    checkIR ir2 [text|
+      define external ccc ptr @func_with_ptrs(ptr %a_0, ptr %b_0) {
+      start:
+        ret ptr %a_0
       }
       |]
 
@@ -350,23 +362,24 @@ spec = describe "constructing LLVM IR" $ do
             b <- ptrtoint a i64
             ret b
     checkIR ir [text|
-      define external ccc i64 @func(i32* %ptr_a_0) {
+      define external ccc i64 @func(ptr %ptr_a_0) {
       start:
-        %0 = ptrtoint i32* %ptr_a_0 to i64
+        %0 = ptrtoint ptr %ptr_a_0 to i64
         ret i64 %0
       }
       |]
 
   it "supports 'bitcast' instruction" $ do
+    -- TODO improve example once vector or float types are added
     let ir = do
           function "func" [(ptr i32, "ptr_a")] (ptr i64) $ \[a] -> do
             b <- a `bitcast` ptr i64
             ret b
     checkIR ir [text|
-      define external ccc i64* @func(i32* %ptr_a_0) {
+      define external ccc ptr @func(ptr %ptr_a_0) {
       start:
-        %0 = bitcast i32* %ptr_a_0 to i64*
-        ret i64* %0
+        %0 = bitcast ptr %ptr_a_0 to ptr
+        ret ptr %0
       }
       |]
 
@@ -388,10 +401,21 @@ spec = describe "constructing LLVM IR" $ do
             function "func" [(i32, "a"), (i32, "b")] i1 $ \[a, b] -> do
               c <- icmp cmp a b
               ret c
+          ir2 = do
+            function "func2" [(ptr i32, "a"), (ptr i32, "b")] i1 $ \[a, b] -> do
+              c <- icmp cmp a b
+              ret c
       checkIR ir [text|
         define external ccc i1 @func(i32 %a_0, i32 %b_0) {
         start:
           %0 = icmp $cmpText i32 %a_0, %b_0
+          ret i1 %0
+        }
+        |]
+      checkIR ir2 [text|
+        define external ccc i1 @func2(ptr %a_0, ptr %b_0) {
+        start:
+          %0 = icmp $cmpText ptr %a_0, %b_0
           ret i1 %0
         }
         |]
@@ -417,14 +441,14 @@ spec = describe "constructing LLVM IR" $ do
     let ir = do
           function "func" [(ptr i64, "a"), (ptr (ptr (ptr i64)), "b")] (ptr i64) $ \[a, b] -> do
             c <- gep a [int32 1]
-            _ <- gep b [int32 1, int32 2, int32 3]
+            _ <- gep b [int32 2]
             ret c
     checkIR ir [text|
-      define external ccc i64* @func(i64* %a_0, i64*** %b_0) {
+      define external ccc ptr @func(ptr %a_0, ptr %b_0) {
       start:
-        %0 = getelementptr i64, i64* %a_0, i32 1
-        %1 = getelementptr i64**, i64*** %b_0, i32 1, i32 2, i32 3
-        ret i64* %0
+        %0 = getelementptr i64, ptr %a_0, i32 1
+        %1 = getelementptr ptr, ptr %b_0, i32 2
+        ret ptr %0
       }
       |]
 
@@ -442,11 +466,11 @@ spec = describe "constructing LLVM IR" $ do
 
       %my_struct2 = type {%my_struct, i1}
 
-      define external ccc i64* @func(%my_struct2* %a_0) {
+      define external ccc ptr @func(ptr %a_0) {
       start:
-        %0 = getelementptr %my_struct2, %my_struct2* %a_0, i32 0, i32 0, i32 1
-        %1 = getelementptr %my_struct2, %my_struct2* %a_0, i32 0, i32 1
-        ret i64* %0
+        %0 = getelementptr %my_struct2, ptr %a_0, i32 0, i32 0, i32 1
+        %1 = getelementptr %my_struct2, ptr %a_0, i32 0, i32 1
+        ret ptr %0
       }
       |]
 
@@ -458,10 +482,10 @@ spec = describe "constructing LLVM IR" $ do
             c <- gep a [int32 0, int32 5]
             ret c
     checkIR ir [text|
-      define external ccc i32* @func([10 x i32]* %a_0) {
+      define external ccc ptr @func(ptr %a_0) {
       start:
-        %0 = getelementptr [10 x i32], [10 x i32]* %a_0, i32 0, i32 5
-        ret i32* %0
+        %0 = getelementptr [10 x i32], ptr %a_0, i32 0, i32 5
+        ret ptr %0
       }
       |]
 
@@ -472,10 +496,10 @@ spec = describe "constructing LLVM IR" $ do
             _ <- load a 8
             ret b
     checkIR ir [text|
-      define external ccc i64 @func(i64* %a_0) {
+      define external ccc i64 @func(ptr %a_0) {
       start:
-        %0 = load i64, i64* %a_0
-        %1 = load i64, i64* %a_0, align 8
+        %0 = load i64, ptr %a_0
+        %1 = load i64, ptr %a_0, align 8
         ret i64 %0
       }
       |]
@@ -487,10 +511,10 @@ spec = describe "constructing LLVM IR" $ do
             store a 8 (int64 10)
             retVoid
     checkIR ir [text|
-      define external ccc void @func(i64* %a_0) {
+      define external ccc void @func(ptr %a_0) {
       start:
-        store i64 10, i64* %a_0
-        store i64 10, i64* %a_0, align 8
+        store i64 10, ptr %a_0
+        store i64 10, ptr %a_0, align 8
         ret void
       }
       |]
@@ -524,17 +548,55 @@ spec = describe "constructing LLVM IR" $ do
         ret i32 %1
       }
       |]
+    let ir2 = do
+          function "func" [(ptr i32, "a"), (ptr i32, "b")] (ptr i32) $ \[a, b] -> mdo
+            c <- icmp EQ a b
+            condBr c block1 block2
+
+            block1 <- block
+            br block3
+
+            block2 <- block
+            br block3
+
+            block3 <- block
+            d <- phi [(a, block1), (b, block2)]
+            ret d
+    checkIR ir2 [text|
+      define external ccc ptr @func(ptr %a_0, ptr %b_0) {
+      start:
+        %0 = icmp eq ptr %a_0, %b_0
+        br i1 %0, label %block_0, label %block_1
+      block_0:
+        br label %block_2
+      block_1:
+        br label %block_2
+      block_2:
+        %1 = phi ptr [%a_0, %block_0], [%b_0, %block_1]
+        ret ptr %1
+      }
+      |]
+
 
   it "supports 'call' instruction" $ do
     let ir = mdo
-          func <- function "func" [(i32, "a")] (i32) $ \[a] -> do
+          func <- function "func" [(i32, "a")] i32 $ \[a] -> do
             ret =<< call func [a]
+
+          func2 <- function "func2" [(ptr i32, "a")] i32 $ \[a] -> do
+            ret =<< call func2 [a]
 
           pure ()
     checkIR ir [text|
       define external ccc i32 @func(i32 %a_0) {
       start:
         %0 = call ccc i32 @func(i32 %a_0)
+        ret i32 %0
+      }
+
+      define external ccc i32 @func2(ptr %a_0) {
+      start:
+        %0 = call ccc i32 @func2(ptr %a_0)
         ret i32 %0
       }
       |]
@@ -549,6 +611,16 @@ spec = describe "constructing LLVM IR" $ do
         ret i1 %a_0
       }
       |]
+    let ir2 = do
+          function "func" [(ptr i1, "a")] (ptr i1) $ \[a] -> do
+            ret a
+    checkIR ir2 [text|
+      define external ccc ptr @func(ptr %a_0) {
+      start:
+        ret ptr %a_0
+      }
+      |]
+
 
   it "supports 'retVoid' instruction" $ do
     let ir = do
@@ -682,6 +754,17 @@ spec = describe "constructing LLVM IR" $ do
         ret i1 %0
       }
       |]
+    let ir2 = do
+          function "with_ptrs" [(i1, "bool"), (ptr i8, "a"), (ptr i8, "b")] (ptr i8) $ \[boolean, a, b] -> do
+            c <- select boolean a b
+            ret c
+    checkIR ir2 [text|
+      define external ccc ptr @with_ptrs(i1 %bool_0, ptr %a_0, ptr %b_0) {
+      start:
+        %0 = select i1 %bool_0, ptr %a_0, ptr %b_0
+        ret ptr %0
+      }
+      |]
 
   it "supports 'bit' for creating i1 values" $ do
     let ir = do
@@ -763,9 +846,9 @@ spec = describe "constructing LLVM IR" $ do
           function "func" [] (ptr i8) $ \[] -> do
             ret $ nullPtr i8
     checkIR ir [text|
-      define external ccc i8* @func() {
+      define external ccc ptr @func() {
       start:
-        ret i8* zeroinitializer
+        ret ptr zeroinitializer
       }
       |]
 
