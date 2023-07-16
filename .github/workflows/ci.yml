@@ -11,8 +11,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        ghc-version: ['9.2.7', '9.4.4']
+        os: [ubuntu-latest]
+        # TODO enable macos again once LLVM 17 is added there
+        # os: [ubuntu-latest, macos-latest]
+        ghc-version: ["9.2.7", "9.4.4"]
 
     steps:
       - uses: actions/checkout@v3
@@ -23,8 +25,19 @@ jobs:
         with:
           ghc-version: ${{ matrix.ghc-version }}
           # Defaults, added for clarity:
-          cabal-version: 'latest'
+          cabal-version: "latest"
           cabal-update: true
+
+      - name: Set up LLVM
+        run: |
+          echo "Installing llvm-17 on $RUNNER_OS"
+          if [ "$RUNNER_OS" == "macOS" ]; then
+              brew install llvm@17
+          else
+              wget https://apt.llvm.org/llvm.sh
+              chmod +x llvm.sh
+              sudo ./llvm.sh 17
+          fi
 
       - name: Installed minor versions of GHC and Cabal
         shell: bash
@@ -34,11 +47,7 @@ jobs:
           echo "GHC_VERSION=${GHC_VERSION}"     >> "${GITHUB_ENV}"
           echo "CABAL_VERSION=${CABAL_VERSION}" >> "${GITHUB_ENV}"
           cabal install hspec-discover
-          if [ "$RUNNER_OS" == "macOS" ]; then
-              echo "Installing llvm-14 on $RUNNER_OS"
-              brew install llvm@14
-          fi
-          
+
       - name: Configure the build
         run: |
           cabal configure --enable-tests --enable-benchmarks --disable-documentation
@@ -69,7 +78,7 @@ jobs:
       - name: Build
         run: |
           if [ "$RUNNER_OS" == "macOS" ]; then
-              export PATH="/usr/local/opt/llvm@14/bin:$PATH"
+              export PATH="/usr/local/opt/llvm@17/bin:$PATH"
               echo "PATH=$PATH"
               which llvm-config
           fi
@@ -78,7 +87,7 @@ jobs:
       - name: Run tests
         run: |
           if [ "$RUNNER_OS" == "macOS" ]; then
-              export PATH="/usr/local/opt/llvm@14/bin:$PATH"
+              export PATH="/usr/local/opt/llvm@17/bin:$PATH"
               echo "PATH=$PATH"
               which llvm-config
           fi

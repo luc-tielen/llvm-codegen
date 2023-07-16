@@ -43,8 +43,8 @@ void = VoidType
 
 renderType :: Renderer Type
 renderType buf = \case
-  PointerType ty ->
-    renderType buf ty |>. '*'
+  PointerType _ ->
+    buf |># "ptr"#
   IntType bits ->
     buf |>. 'i' |>$ bits
   FunctionType retTy argTys ->

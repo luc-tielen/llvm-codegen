@@ -24,6 +24,7 @@ module LLVM.Codegen.IRBuilder
   , zext
   , ptrtoint
   , bitcast
+  , ptrcast
   , icmp
   , alloca
   , gep
@@ -130,10 +131,26 @@ ptrtoint val ty =
   emitInstr ty $ PtrToInt val ty
 {-# INLINEABLE ptrtoint #-}
 
+-- At the moment not useful because of introduction of opaque pointers.
+-- Will become more useful once float or vector types are added again.
 bitcast :: (MonadIRBuilder m, HasCallStack) => Operand -> Type -> m Operand
 bitcast val ty =
   emitInstr ty $ Bitcast val ty
 {-# INLINEABLE bitcast #-}
+
+-- Casts a pointer to be a pointer containing type "ty".
+-- This helper function is introduced to smooth the transition between
+-- LLVM14 -> LLVM15+ (opaque pointer migration).
+-- All bitcasts of pointers should be replaced with ptrcasts
+ptrcast :: Type -> Operand -> Operand
+ptrcast ty = \case
+  LocalRef (PointerType _) name ->
+    LocalRef (PointerType ty) name
+  ConstantOperand (NullPtr _) ->
+    ConstantOperand $ NullPtr ty
+  _ ->
+    error "'ptrcast' is only supported for pointer operands."
+{-# INLINEABLE ptrcast #-}
 
 icmp :: (MonadIRBuilder m, HasCallStack) => ComparisonType -> Operand -> Operand -> m Operand
 icmp cmp a b =
@@ -180,7 +197,11 @@ gep operand indices = do
 
 computeGepType :: (MonadModuleBuilder m, HasCallStack) => Type -> [Operand] -> m (Either String Type)
 computeGepType ty [] = pure $ Right $ PointerType ty
-computeGepType (PointerType ty) (_ : is) = computeGepType ty is
+computeGepType (PointerType ty) (_ : idxs) =
+  case (ty, null idxs) of
+    -- If you want to load something from e.g. i8***, you need to gep + load for each pointer indirection!
+    (PointerType{}, False) -> pure $ Left "Opaque pointers support only one gep offset."
+    _ -> computeGepType ty idxs
 computeGepType (StructureType _ elTys) (ConstantOperand (Int 32 val):is) =
   computeGepType (elTys !! fromIntegral val) is
 computeGepType (StructureType _ _) (i:_) =
@@ -188,8 +209,8 @@ computeGepType (StructureType _ _) (i:_) =
 computeGepType (ArrayType _ elTy) (_:is) = computeGepType elTy is
 computeGepType (NamedTypeReference n) is =
   lookupType n >>= \case
-  Nothing -> pure $ Left $ "Couldn’t resolve typedef for: " <> show n
-  Just ty -> computeGepType ty is
+    Nothing -> pure $ Left $ "Couldn’t resolve typedef for: " <> show n
+    Just ty -> computeGepType ty is
 computeGepType ty _ =
   pure $ Left $ "Expecting aggregate type. (Malformed AST): " <> show ty
 {-# INLINEABLE computeGepType #-}
