@@ -2,7 +2,7 @@ build: configure
 	@cabal build all
 
 configure:
-	@cabal configure --enable-tests --enable-benchmarks --disable-documentation
+	@cabal configure --enable-tests
 
 clean:
 	@cabal clean
