@@ -42,18 +42,23 @@ lookupFlagAssignment :: FlagName -> FlagAssignment -> Maybe Bool
 lookupFlagAssignment = lookup
 #endif
 
-llvmVersion :: Version
-llvmVersion = mkVersion [17,0]
+supportedLLVMVersions :: [Version]
+supportedLLVMVersions =
+  [ mkVersion [17,0,0]
+  , mkVersion [16,0,0]
+  , mkVersion [15,0,0]
+  ]
 
--- Ordered by decreasing specificty so we will prefer llvm-config-9.0
--- over llvm-config-9 over llvm-config.
+-- Ordered by decreasing specificty so we will prefer llvm-config-17.0
+-- over llvm-config-17 over llvm-config. Also looks for newer LLVM versions first
 llvmConfigNames :: [String]
 llvmConfigNames = reverse versionedConfigs ++ ["llvm-config"]
   where
+    versionSuffixes :: [[Int]]
+    versionSuffixes =
+      concatMap (\v -> tail (inits (versionNumbers v))) supportedLLVMVersions
     versionedConfigs =
-      map
-        (\vs -> "llvm-config-" ++ intercalate "." (map show vs))
-        (tail (inits (versionNumbers llvmVersion)))
+      map (\vs -> "llvm-config-" <> intercalate "." (map show vs)) versionSuffixes
 
 findJustBy :: Monad m => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
 findJustBy f (x:xs) = do
@@ -73,11 +78,21 @@ llvmProgram = (simpleProgram "llvm-config") {
     in findProgramVersion "--version" (stripVcsSuffix . trim) verbosity path
  }
 
+betweenVersions :: Version -> Version -> VersionRange
+betweenVersions minVersion maxVersion =
+  intersectVersionRanges
+    (orLaterVersion minVersion)
+    (orEarlierVersion maxVersion)
+
 getLLVMConfig :: ConfigFlags -> IO ([String] -> IO String)
 getLLVMConfig confFlags = do
   let verbosity = fromFlag $ configVerbosity confFlags
+      minVersion = minimum supportedLLVMVersions
+      maxVersion = maximum supportedLLVMVersions
+      -- llvm-config >= min version && <= max version
+      versionRange = betweenVersions minVersion maxVersion
   (program, _, _) <- requireProgramVersion verbosity llvmProgram
-                     (withinVersion llvmVersion)
+                     versionRange
                      (configPrograms confFlags)
   return $ getProgramOutput verbosity program
 
