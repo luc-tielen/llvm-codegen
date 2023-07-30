@@ -1,10 +1,12 @@
 # llvm-codegen
+
 [![build](https://github.com/luc-tielen/llvm-codegen/actions/workflows/ci.yml/badge.svg)](https://github.com/luc-tielen/llvm-codegen/actions/workflows/ci.yml)
 
 A Haskell library for generating LLVM code. Inspired by the `llvm-hs`,
 `llvm-hs-pure`, `llvm-hs-combinators` and the `llvm-hs-pretty` libraries.
 
-**NOTE: WIP**
+**NOTE:** WIP, but if you only need the provided instructions it's usable (and
+tested).
 
 ## Why another LLVM library?
 
@@ -14,5 +16,6 @@ A Haskell library for generating LLVM code. Inspired by the `llvm-hs`,
 ## TODO
 
 - [ ] Add support for remaining instructions as needed
+- [ ] SIMD support, combinators
 - [ ] Support API with more compile time checks?
 - [ ] Documentation
