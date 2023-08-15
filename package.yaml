@@ -45,7 +45,7 @@ ghc-options:
   - -fhide-source-paths
   - -fno-show-valid-hole-fits
   - -fno-sort-valid-hole-fits
-  - -optl=-lLLVM-14
+  - -optl=-lLLVM
 
 system-build-tools: llvm-config
 
