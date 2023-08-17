@@ -61,7 +61,7 @@ library
 
   ghc-options:
     -Wall -fhide-source-paths -fno-show-valid-hole-fits
-    -fno-sort-valid-hole-fits -optl=-lLLVM-17
+    -fno-sort-valid-hole-fits -optl=-lLLVM
 
   build-tools:        llvm-config >=0
   build-depends:
@@ -108,7 +108,7 @@ test-suite llvm-codegen-test
 
   ghc-options:
     -Wall -fhide-source-paths -fno-show-valid-hole-fits
-    -fno-sort-valid-hole-fits -optl=-lLLVM-17
+    -fno-sort-valid-hole-fits -optl=-lLLVM
 
   build-tools:        llvm-config >=0
   build-depends:
