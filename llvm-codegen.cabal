@@ -1,124 +1,129 @@
-cabal-version: 2.0
+cabal-version:      2.0
 
 -- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
-name:           llvm-codegen
-version:        0.1.0.0
-category:       Compilers
-homepage:       https://github.com/luc-tielen/llvm-codegen
-author:         Luc Tielen
-maintainer:     luc.tielen@gmail.com
-copyright:      Luc Tielen, 2022
-license:        BSD3
-license-file:   LICENSE
-build-type:     Custom
-extra-source-files:
-    README.md
+name:               llvm-codegen
+version:            0.1.0.0
+category:           Compilers
+homepage:           https://github.com/luc-tielen/llvm-codegen
+author:             Luc Tielen
+maintainer:         luc.tielen@gmail.com
+copyright:          Luc Tielen, 2022
+license:            BSD3
+license-file:       LICENSE
+build-type:         Custom
+extra-source-files: README.md
 
 custom-setup
   setup-depends:
-      Cabal
-    , base
+      base
+    , Cabal
     , containers
 
 library
+  -- cabal-fmt: expand lib
   exposed-modules:
-      LLVM.C.API
-      LLVM.C.Bindings
-      LLVM.Codegen
-      LLVM.Codegen.Flag
-      LLVM.Codegen.IR
-      LLVM.Codegen.IRBuilder
-      LLVM.Codegen.IRBuilder.Monad
-      LLVM.Codegen.ModuleBuilder
-      LLVM.Codegen.Name
-      LLVM.Codegen.Operand
-      LLVM.Codegen.Type
-      LLVM.Pretty
-  other-modules:
-      Paths_llvm_codegen
-  autogen-modules:
-      Paths_llvm_codegen
-  hs-source-dirs:
-      lib
+    LLVM.C.API
+    LLVM.C.Bindings
+    LLVM.Codegen
+    LLVM.Codegen.Flag
+    LLVM.Codegen.IR
+    LLVM.Codegen.IRBuilder
+    LLVM.Codegen.IRBuilder.Monad
+    LLVM.Codegen.ModuleBuilder
+    LLVM.Codegen.Name
+    LLVM.Codegen.Operand
+    LLVM.Codegen.Type
+    LLVM.Pretty
+
+  other-modules:      Paths_llvm_codegen
+  autogen-modules:    Paths_llvm_codegen
+  hs-source-dirs:     lib
   default-extensions:
-      OverloadedStrings
-      LambdaCase
-      TupleSections
-      DeriveFunctor
-      DeriveFoldable
-      DeriveTraversable
-      DeriveGeneric
-      DeriveAnyClass
-      DerivingStrategies
-      DerivingVia
-      FlexibleContexts
-      FlexibleInstances
-      ScopedTypeVariables
-      DefaultSignatures
-      LinearTypes
-      MagicHash
-  ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits -optl=-lLLVM
-  build-tools:
-      llvm-config
+    DefaultSignatures
+    DeriveAnyClass
+    DeriveFoldable
+    DeriveFunctor
+    DeriveGeneric
+    DeriveTraversable
+    DerivingStrategies
+    DerivingVia
+    FlexibleContexts
+    FlexibleInstances
+    LambdaCase
+    LinearTypes
+    MagicHash
+    OverloadedStrings
+    ScopedTypeVariables
+    TupleSections
+
+  ghc-options:
+    -Wall -fhide-source-paths -fno-show-valid-hole-fits
+    -fno-sort-valid-hole-fits -optl=-lLLVM
+
+  build-tools:        llvm-config >=0
   build-depends:
-      base >=4.7 && <5
-    , bytestring ==0.11.*
-    , containers ==0.*
-    , dlist ==1.*
-    , ghc-prim ==0.*
-    , mmorph ==1.1.5
-    , mtl ==2.*
-    , text ==2.*
-    , text-builder-linear ==0.*
-  default-language: Haskell2010
+      base                 >=4.7   && <5
+    , bytestring           >=0.11  && <0.12
+    , containers           <1
+    , dlist                >=1     && <2
+    , ghc-prim             <1
+    , mmorph               ==1.1.5
+    , mtl                  >=2     && <3
+    , text                 >=2     && <3
+    , text-builder-linear  <1
+
+  default-language:   Haskell2010
 
 test-suite llvm-codegen-test
-  type: exitcode-stdio-1.0
-  main-is: test.hs
+  type:               exitcode-stdio-1.0
+  main-is:            test.hs
   other-modules:
-      Test.LLVM.C.APISpec
-      Test.LLVM.Codegen.IRBuilderSpec
-      Test.LLVM.Codegen.IRCombinatorsSpec
-      Paths_llvm_codegen
-  autogen-modules:
-      Paths_llvm_codegen
-  hs-source-dirs:
-      tests
+    Paths_llvm_codegen
+    Test.LLVM.C.APISpec
+    Test.LLVM.Codegen.IRBuilderSpec
+    Test.LLVM.Codegen.IRCombinatorsSpec
+
+  autogen-modules:    Paths_llvm_codegen
+  hs-source-dirs:     tests
   default-extensions:
-      OverloadedStrings
-      LambdaCase
-      TupleSections
-      DeriveFunctor
-      DeriveFoldable
-      DeriveTraversable
-      DeriveGeneric
-      DeriveAnyClass
-      DerivingStrategies
-      DerivingVia
-      FlexibleContexts
-      FlexibleInstances
-      ScopedTypeVariables
-      DefaultSignatures
-      LinearTypes
-      MagicHash
-  ghc-options: -Wall -fhide-source-paths -fno-show-valid-hole-fits -fno-sort-valid-hole-fits -optl=-lLLVM
-  build-tools:
-      llvm-config
+    DefaultSignatures
+    DeriveAnyClass
+    DeriveFoldable
+    DeriveFunctor
+    DeriveGeneric
+    DeriveTraversable
+    DerivingStrategies
+    DerivingVia
+    FlexibleContexts
+    FlexibleInstances
+    LambdaCase
+    LinearTypes
+    MagicHash
+    OverloadedStrings
+    ScopedTypeVariables
+    TupleSections
+
+  ghc-options:
+    -Wall -fhide-source-paths -fno-show-valid-hole-fits
+    -fno-sort-valid-hole-fits -optl=-lLLVM
+
+  build-tools:        llvm-config >=0
   build-depends:
-      base >=4.7 && <5
-    , bytestring ==0.11.*
-    , containers ==0.*
-    , dlist ==1.*
-    , ghc-prim ==0.*
-    , hspec >=2.6.1 && <3.0.0
-    , hspec-hedgehog ==0.*
+      base                 >=4.7   && <5
+    , bytestring           >=0.11  && <0.12
+    , containers           <1
+    , dlist                >=1     && <2
+    , ghc-prim             <1
+    , hspec                >=2.6.1 && <3.0.0
+    , hspec-hedgehog       <1
     , llvm-codegen
-    , mmorph ==1.1.5
-    , mtl ==2.*
-    , neat-interpolation ==0.*
-    , text ==2.*
-    , text-builder-linear ==0.*
-  default-language: Haskell2010
+    , mmorph               ==1.1.5
+    , mtl                  >=2     && <3
+    , neat-interpolation   <1
+    , text                 >=2     && <3
+    , text-builder-linear  <1
+
+  default-language:   Haskell2010
