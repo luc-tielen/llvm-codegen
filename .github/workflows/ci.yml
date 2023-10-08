@@ -30,7 +30,7 @@ jobs:
         run: |
           echo "Installing llvm-17 on $RUNNER_OS"
           if [ "$RUNNER_OS" == "macOS" ]; then
-              brew install llvm@17
+              brew install llvm
           else
               wget https://apt.llvm.org/llvm.sh
               chmod +x llvm.sh
