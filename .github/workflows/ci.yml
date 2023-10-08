@@ -11,16 +11,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        # TODO enable macos again once LLVM 17 is added there
-        # os: [ubuntu-latest, macos-latest]
-        ghc-version: ["9.2.7", "9.4.4"]
+        os: [ubuntu-latest, macos-latest]
+        ghc-version: ["9.2.7", "9.4.4", "9.6.1"]
 
     steps:
       - uses: actions/checkout@v3
 
       - name: Set up GHC ${{ matrix.ghc-version }}
-        uses: haskell/actions/setup@v2
+        uses: haskell-actions/setup@v2
         id: setup
         with:
           ghc-version: ${{ matrix.ghc-version }}
@@ -32,6 +30,7 @@ jobs:
         run: |
           echo "Installing llvm-17 on $RUNNER_OS"
           if [ "$RUNNER_OS" == "macOS" ]; then
+              brew update
               brew install llvm@17
           else
               wget https://apt.llvm.org/llvm.sh
@@ -78,17 +77,18 @@ jobs:
       - name: Build
         run: |
           if [ "$RUNNER_OS" == "macOS" ]; then
-              export PATH="/usr/local/opt/llvm@17/bin:$PATH"
-              echo "PATH=$PATH"
-              which llvm-config
+              export PATH="/usr/local/opt/llvm/bin:$PATH"
+              export LDFLAGS="-L/usr/local/opt/llvm/lib"
+              export CPPFLAGS="-I/usr/local/opt/llvm/include"
+              llvm-config --version
           fi
           cabal build all
 
       - name: Run tests
         run: |
           if [ "$RUNNER_OS" == "macOS" ]; then
-              export PATH="/usr/local/opt/llvm@17/bin:$PATH"
-              echo "PATH=$PATH"
-              which llvm-config
+              export PATH="/usr/local/opt/llvm/bin:$PATH"
+              export LDFLAGS="-L/usr/local/opt/llvm/lib"
+              export CPPFLAGS="-I/usr/local/opt/llvm/include"
           fi
           cabal test all
