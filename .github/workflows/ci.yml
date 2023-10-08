@@ -11,10 +11,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        # TODO enable macos again once LLVM 17 is added there
-        # os: [ubuntu-latest, macos-latest]
-        ghc-version: ["9.2.7", "9.4.4"]
+        os: [ubuntu-latest, macos-latest]
+        ghc-version: ["9.2.7", "9.4.4", "9.6.1"]
 
     steps:
       - uses: actions/checkout@v3
@@ -78,8 +76,12 @@ jobs:
       - name: Build
         run: |
           if [ "$RUNNER_OS" == "macOS" ]; then
-              export PATH="/usr/local/opt/llvm@17/bin:$PATH"
+              export PATH="/usr/local/opt/llvm/bin:$PATH"
               echo "PATH=$PATH"
+              export LDFLAGS="-L/usr/local/opt/llvm/lib"
+              echo "LDFLAGS=$LDFLAGS"
+              export CPPFLAGS="-I/usr/local/opt/llvm/include"
+              echo "CPPFLAGS=$CPPFLAGS"
               which llvm-config
           fi
           cabal build all
@@ -87,8 +89,12 @@ jobs:
       - name: Run tests
         run: |
           if [ "$RUNNER_OS" == "macOS" ]; then
-              export PATH="/usr/local/opt/llvm@17/bin:$PATH"
+              export PATH="/usr/local/opt/llvm/bin:$PATH"
               echo "PATH=$PATH"
+              export LDFLAGS="-L/usr/local/opt/llvm/lib"
+              echo "LDFLAGS=$LDFLAGS"
+              export CPPFLAGS="-I/usr/local/opt/llvm/include"
+              echo "CPPFLAGS=$CPPFLAGS"
               which llvm-config
           fi
           cabal test all
