@@ -65,14 +65,14 @@ library
 
   build-tools:        llvm-config >=0
   build-depends:
-      base                 >=4.7   && <5
-    , bytestring           >=0.11  && <0.12
+      base                 >=4.7  && <5
+    , bytestring           >=0.11 && <0.12
     , containers           <1
-    , dlist                >=1     && <2
+    , dlist                >=1    && <2
     , ghc-prim             <1
-    , mmorph               ==1.1.5
-    , mtl                  >=2     && <3
-    , text                 >=2     && <3
+    , mmorph               >=1    && <2
+    , mtl                  >=2    && <3
+    , text                 >=2    && <3
     , text-builder-linear  <1
 
   default-language:   Haskell2010
