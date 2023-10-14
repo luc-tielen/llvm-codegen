@@ -32,6 +32,7 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.Except
 import Control.Monad.Morph
+import Control.Monad.Fix
 import Data.DList (DList)
 import Data.Map (Map)
 import Data.String

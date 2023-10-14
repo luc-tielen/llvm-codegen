@@ -26,10 +26,12 @@ import qualified Control.Monad.State.Strict as StrictState
 import qualified Control.Monad.State.Lazy as LazyState
 import qualified Control.Monad.RWS.Lazy as LazyRWS
 import qualified Control.Monad.RWS.Strict as StrictRWS
+import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.Except
 import Control.Monad.Morph
+import Control.Monad.Fix
 import Data.Functor.Identity
 import qualified Data.Text as T
 import qualified Data.DList as DList
@@ -37,6 +39,7 @@ import Data.DList (DList)
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Maybe
+import Data.Monoid
 import LLVM.Codegen.Operand
 import LLVM.Codegen.IR
 import LLVM.Codegen.Type
