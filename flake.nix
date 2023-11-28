@@ -9,7 +9,7 @@
   outputs = { self, np, fu, ds, nf, ... }@inputs:
     with np.lib;
     with fu.lib;
-    eachSystem [ "x86_64-linux" "x86_64-darwin" ] (system:
+    eachSystem [ "x86_64-linux" "x86_64-darwin" "aarch64-darwin" ] (system:
       let
         ghcVersion = "902";
         llvmVersion = 14;
@@ -46,7 +46,7 @@
           system = if system == "aarch64-darwin"
                    then "x86_64-darwin"
                    else system;
-          overlays = [ overlay ds.overlay ];
+          overlays = [ overlay ds.overlay (import ./nix/overlays/ghc.nix)];
         };
       in with pkgs.lib; rec {
         inherit overlay;
