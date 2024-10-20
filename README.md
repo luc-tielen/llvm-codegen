@@ -6,7 +6,10 @@ A Haskell library for generating LLVM code. Inspired by the `llvm-hs`,
 `llvm-hs-pure`, `llvm-hs-combinators` and the `llvm-hs-pretty` libraries.
 
 **NOTE:** WIP, but if you only need the provided instructions it's usable (and
-tested).
+tested). Used inside the [eclair compiler](https://github.com/luc-tielen/eclair-lang.git).
+
+Note that it requires LLVM to be installed on your system and available on your
+`$PATH`!
 
 ## Why another LLVM library?
 
