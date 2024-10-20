@@ -10,16 +10,19 @@ category:           Compilers
 homepage:           https://github.com/luc-tielen/llvm-codegen
 author:             Luc Tielen
 maintainer:         luc.tielen@gmail.com
-copyright:          Luc Tielen, 2022
+copyright:          Luc Tielen, 2024
 license:            BSD3
 license-file:       LICENSE
 build-type:         Custom
 extra-source-files: README.md
+synopsis:           A DSL for LLVM IR code generation based on llvm-hs.
+description:
+  A DSL for LLVM IR code generation. Heavily inspired by llvm-hs.
 
 custom-setup
   setup-depends:
-      base
-    , Cabal
+      base        <5
+    , Cabal       <4
     , containers
 
 library
