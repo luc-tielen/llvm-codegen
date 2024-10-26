@@ -77,9 +77,9 @@ jobs:
       - name: Build
         run: |
           if [ "$RUNNER_OS" == "macOS" ]; then
-              export PATH="/usr/local/opt/llvm/bin:$PATH"
-              export LDFLAGS="-L/usr/local/opt/llvm/lib"
-              export CPPFLAGS="-I/usr/local/opt/llvm/include"
+              export PATH="/opt/homebrew/opt/llvm@17/bin:$PATH"
+              export LDFLAGS="-L/opt/homebrew/opt/llvm@17/lib"
+              export CPPFLAGS="-I/opt/homebrew/opt/llvm@17/include"
               llvm-config --version
           fi
           cabal build all
@@ -87,8 +87,9 @@ jobs:
       - name: Run tests
         run: |
           if [ "$RUNNER_OS" == "macOS" ]; then
-              export PATH="/usr/local/opt/llvm/bin:$PATH"
-              export LDFLAGS="-L/usr/local/opt/llvm/lib"
-              export CPPFLAGS="-I/usr/local/opt/llvm/include"
+              export PATH="/opt/homebrew/opt/llvm@17/bin:$PATH"
+              export LDFLAGS="-L/opt/homebrew/opt/llvm@17/lib"
+              export CPPFLAGS="-I/opt/homebrew/opt/llvm@17/include"
+              llvm-config --version
           fi
           cabal test all
