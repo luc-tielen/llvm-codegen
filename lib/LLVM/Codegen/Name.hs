@@ -4,7 +4,7 @@ module LLVM.Codegen.Name
   , renderName
   ) where
 
-import Data.Text
+import Data.Text hiding (show)
 import Data.String
 import LLVM.Pretty
 
